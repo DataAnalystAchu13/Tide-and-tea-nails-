@@ -20,7 +20,13 @@ self.addEventListener("fetch", (e) => {
     );
     return;
   }
-  if (/\.(css|js|mjs|webp|png|svg|jpg|woff2?)$/.test(url.pathname)) {
+  // Code and styles: network first so a new build shows at once; cached copy only when offline.
+  if (/\.(css|js|mjs)$/.test(url.pathname)) {
+    e.respondWith(fetch(req).then((res) => { if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); } return res; })
+      .catch(async () => (await caches.match(req, { ignoreSearch: true })) || Response.error()));
+    return;
+  }
+  if (/\.(webp|png|svg|jpg|woff2?)$/.test(url.pathname)) {
     e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
       return res;
