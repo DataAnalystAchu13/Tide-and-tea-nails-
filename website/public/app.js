@@ -74,12 +74,48 @@ async function firebaseBackend() {
         status: "payment_submitted", paymentRef: ref, paymentSubmittedAt: fs.serverTimestamp(), updatedAt: fs.serverTimestamp(),
       });
     },
+    watchChat(id, cb) {
+      const q = fs.query(fs.collection(db, "chats", id, "messages"), fs.orderBy("at"), fs.limitToLast(200));
+      return fs.onSnapshot(q, (snap) => cb(snap.docs.map((d) => {
+        const m = d.data();
+        return { id: d.id, ...m, at: m.at?.toMillis?.() || Date.now(), pending: d.metadata.hasPendingWrites };
+      })), (e) => { console.warn(e); cb([]); });
+    },
+    watchChatMeta(id, cb) {
+      return fs.onSnapshot(fs.doc(db, "chats", id), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
+    },
+    async markChatRead(id) {
+      try { await fs.updateDoc(fs.doc(db, "chats", id), { customerUnread: 0 }); } catch {}
+    },
+    async sendChat(b, text, file, onProgress) {
+      const msgRef = fs.doc(fs.collection(db, "chats", b.id, "messages"));
+      const data = { from: "customer", text, at: fs.serverTimestamp() };
+      if (file) {
+        const isVideo = file.type.startsWith("video/");
+        const blob = isVideo ? file : await shrink(file);
+        const ext = isVideo ? (file.name.split(".").pop() || "mp4").toLowerCase() : "jpg";
+        const r = st.ref(storage, `chats/${b.id}/${msgRef.id}.${ext}`);
+        const task = st.uploadBytesResumable(r, blob, { contentType: blob.type || (isVideo ? "video/mp4" : "image/jpeg") });
+        await new Promise((res, rej) => task.on("state_changed", (x) => onProgress(x.bytesTransferred / Math.max(1, x.totalBytes)), rej, res));
+        data.mediaUrl = await st.getDownloadURL(task.snapshot.ref);
+        data.mediaType = isVideo ? "video" : "image";
+      }
+      const batch = fs.writeBatch(db);
+      batch.set(msgRef, data);
+      batch.set(fs.doc(db, "chats", b.id), {
+        customerUid: uid, name: b.name, lastFrom: "customer", lastAt: fs.serverTimestamp(),
+        lastText: text || (data.mediaType === "video" ? "Video" : "Photo"),
+        ownerUnread: fs.increment(1), customerUnread: 0,
+      }, { merge: true });
+      await batch.commit();
+    },
   };
 }
 
 function previewBackend() {
   const KEY = "tide.preview.bookings";
   const listeners = new Set();
+  const chatListeners = new Map();
   const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } };
   const write = (list) => {
     try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { console.warn("Preview storage full", e); }
@@ -102,6 +138,28 @@ function previewBackend() {
     },
     async create(id, data) { write([{ ...data, id, status: "requested", createdAt: Date.now() }, ...read()]); },
     async submitPayment(id, ref) { patch(id, { status: "payment_submitted", paymentRef: ref }); },
+    watchChat(id, cb) {
+      const key = "tide.preview.chat." + id;
+      const load = () => { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } };
+      const fn = () => cb(load());
+      chatListeners.set(id, fn); fn();
+      return () => chatListeners.delete(id);
+    },
+    watchChatMeta(id, cb) { cb(null); return () => {}; },
+    async markChatRead() {},
+    async sendChat(b, text, file, onProgress) {
+      const key = "tide.preview.chat." + b.id;
+      const load = () => { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } };
+      const save = (list) => { try { localStorage.setItem(key, JSON.stringify(list)); } catch {} chatListeners.get(b.id)?.(); };
+      const m = { id: "m" + Date.now(), from: "customer", text, at: Date.now() };
+      if (file) {
+        if (file.type.startsWith("video/")) { m.mediaType = "video"; m.mediaUrl = URL.createObjectURL(file); m.localOnly = true; }
+        else { m.mediaType = "image"; m.mediaUrl = await this.upload(b.id, "chat", file, onProgress); }
+      }
+      save([...load(), m]);
+      setTimeout(() => save([...load(), { id: "o" + Date.now(), from: "owner", at: Date.now(),
+        text: file ? "Love it! I'll plan your set around this 💜" : "Hi! Thanks for your message, I'll get back to you shortly. (Preview reply)" }]), 1400);
+    },
     // Preview-only helper so the owner can see the customer's payment step.
     demoApprove(id) {
       const b = read().find((x) => x.id === id); if (!b) return;
@@ -587,7 +645,16 @@ function upiLink(b) {
   return `upi://pay?${p.toString()}`;
 }
 
+let myBookings = [];
+const metaWatch = new Map();
+const unread = new Map();
 function renderMine(list) {
+  myBookings = list;
+  list.forEach((b) => {
+    if (!metaWatch.has(b.id) && backend) metaWatch.set(b.id, backend.watchChatMeta(b.id, (m) => {
+      unread.set(b.id, (m && m.customerUnread) || 0); paintUnread();
+    }));
+  });
   const sec = $("#mine");
   sec.hidden = list.length === 0; $("#navMine").hidden = list.length === 0;
   $("#myBookings").innerHTML = list.map((b) => {
@@ -616,12 +683,13 @@ function renderMine(list) {
       action = `<div class="note">${esc(b.ownerNote || "This slot didn't work out. Please try another date.")}</div>`;
     }
     const note = b.ownerNote && st !== "declined" ? `<div class="note"><b>From Tide & Tea:</b> ${esc(b.ownerNote)}</div>` : "";
+    const chatBtn = `<div class="pay-row"><button type="button" class="btn btn-quiet btn-sm" data-chat="${esc(b.id)}">Message us<span class="unread" data-unread="${esc(b.id)}" hidden></span></button></div>`;
     const demo = PREVIEW && st === "requested" ? `<div class="demo-tools">Preview: <button type="button" class="linkbtn" data-demo-approve="${esc(b.id)}">approve as the owner</button> to see the payment step.</div>` : "";
     return `
     <article class="card mybk">
       <div class="mybk-top"><h3>${esc(b.extension?.name || "Nail set")}${b.length ? ` · ${esc(b.length.name)}` : ""}</h3><span class="pill st-${esc(st)}">${esc(STATUS[st] || st)}</span></div>
       <div class="meta"><span>${esc(prettyDate(b.date))} at ${esc(b.slot)}</span><span>${b.serviceMode === "home" ? "Home visit" : "Studio visit"}</span><span>Total ${money(price.total)}</span></div>
-      ${note}${action}${demo}
+      ${note}${action}${chatBtn}${demo}
     </article>`;
   }).join("");
   document.querySelectorAll("[data-qr]").forEach((el) => {
@@ -631,6 +699,95 @@ function renderMine(list) {
       el.hidden = false;
     }
   });
+  paintUnread();
+}
+
+function paintUnread() {
+  document.querySelectorAll("[data-unread]").forEach((el) => {
+    const n = unread.get(el.dataset.unread) || 0;
+    el.hidden = n === 0 || chat.id === el.dataset.unread;
+    el.textContent = n;
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Chat with the studio (photos and videos)                            */
+/* ------------------------------------------------------------------ */
+
+const MAX_VIDEO_MB = 60;
+const chat = { id: null, off: null, file: null, fileUrl: null, sending: false };
+
+function openChat(id) {
+  const b = myBookings.find((x) => x.id === id); if (!b) return;
+  closeChat(true);
+  chat.id = id;
+  $("#chatTitle").textContent = `${b.extension?.name || "Your booking"} · ${prettyDate(b.date)}`;
+  $("#chatSheet").hidden = false;
+  document.body.classList.add("sheet-open");
+  $("#chatList").innerHTML = `<p class="muted chat-empty">Loading…</p>`;
+  chat.off = backend.watchChat(id, renderChat);
+  backend.markChatRead(id); unread.set(id, 0); paintUnread();
+  setTimeout(() => $("#chatText").focus(), 50);
+}
+
+function closeChat(silent) {
+  if (chat.off) chat.off();
+  chat.off = null; chat.id = null; clearChatFile();
+  if (!silent) { $("#chatSheet").hidden = true; document.body.classList.remove("sheet-open"); }
+}
+
+function renderChat(list) {
+  const el = $("#chatList");
+  if (!list.length) {
+    el.innerHTML = `<div class="chat-empty"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><p>Ask us anything about your set. You can send photos and short videos too.</p></div>`;
+    return;
+  }
+  const t = (ms) => new Date(ms).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  el.innerHTML = list.map((m) => {
+    const media = m.mediaUrl ? (m.mediaType === "video"
+      ? `<video src="${esc(m.mediaUrl)}" controls playsinline preload="metadata"></video>`
+      : `<a href="${esc(m.mediaUrl)}" target="_blank" rel="noopener"><img src="${esc(m.mediaUrl)}" alt="Photo" loading="lazy"></a>`) : "";
+    return `<div class="msg ${m.from === "customer" ? "me" : "them"}">${media}${m.text ? `<p>${esc(m.text)}</p>` : ""}<time>${m.pending ? "Sending…" : t(m.at)}</time></div>`;
+  }).join("");
+  el.scrollTop = el.scrollHeight;
+  if (chat.id) backend.markChatRead(chat.id);
+}
+
+function clearChatFile() {
+  if (chat.fileUrl) URL.revokeObjectURL(chat.fileUrl);
+  chat.file = null; chat.fileUrl = null;
+  const p = $("#chatPreview"); if (p) { p.hidden = true; p.innerHTML = ""; }
+}
+
+function pickChatFile(file) {
+  if (!file) return;
+  const isVideo = file.type.startsWith("video/");
+  if (!isVideo && !file.type.startsWith("image/")) { toast("Send a photo or a video."); return; }
+  if (isVideo && file.size > MAX_VIDEO_MB * 1024 * 1024) { toast(`Videos can be up to ${MAX_VIDEO_MB} MB. Try a shorter clip.`); return; }
+  clearChatFile();
+  chat.file = file; chat.fileUrl = URL.createObjectURL(file);
+  const p = $("#chatPreview");
+  p.innerHTML = `${isVideo ? `<video src="${chat.fileUrl}" muted playsinline></video>` : `<img src="${chat.fileUrl}" alt="">`}<span>${isVideo ? "Video" : "Photo"} ready to send</span><button type="button" class="linkbtn" id="chatClearFile">Remove</button>`;
+  p.hidden = false;
+}
+
+async function sendChat(e) {
+  e.preventDefault();
+  if (chat.sending || !chat.id) return;
+  const b = myBookings.find((x) => x.id === chat.id); if (!b) return;
+  const input = $("#chatText");
+  const text = input.value.trim().slice(0, 2000);
+  if (!text && !chat.file) return;
+  chat.sending = true; $("#chatSend").disabled = true;
+  const bar = $("#chatBar"); bar.hidden = !chat.file; bar.firstElementChild.style.width = "0%";
+  try {
+    await backend.sendChat(b, text, chat.file, (f) => { bar.firstElementChild.style.width = Math.round(f * 100) + "%"; });
+    input.value = ""; clearChatFile();
+  } catch (err) {
+    console.error(err); toast("Message not sent. Check your connection and try again.");
+  } finally {
+    chat.sending = false; $("#chatSend").disabled = false; bar.hidden = true;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -659,7 +816,19 @@ function renderPrices() {
 let toastT;
 function toast(m) { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 2600); }
 
+function bindChat() {
+  $("#chatForm").addEventListener("submit", sendChat);
+  $("#chatClose").addEventListener("click", () => closeChat());
+  $("#chatSheet").addEventListener("click", (e) => {
+    if (e.target.id === "chatSheet") closeChat();
+    if (e.target.id === "chatClearFile") clearChatFile();
+  });
+  $("#chatFile").addEventListener("change", (e) => { pickChatFile(e.target.files[0]); e.target.value = ""; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#chatSheet").hidden) closeChat(); });
+}
+
 function bind() {
+  bindChat();
   const form = $("#stepForm");
   form.addEventListener("submit", next);
   $("#backBtn").addEventListener("click", () => { collect(); if (step > 0) { step--; renderStep(); } });
@@ -702,6 +871,8 @@ function bind() {
   $("#myBookings").addEventListener("click", async (e) => {
     const c = e.target.closest("[data-copy]");
     if (c) { try { await navigator.clipboard.writeText(c.dataset.copy); toast("UPI ID copied"); } catch { toast(c.dataset.copy); } }
+    const ch = e.target.closest("[data-chat]");
+    if (ch) openChat(ch.dataset.chat);
     const d = e.target.closest("[data-demo-approve]");
     if (d && backend.demoApprove) backend.demoApprove(d.dataset.demoApprove);
   });

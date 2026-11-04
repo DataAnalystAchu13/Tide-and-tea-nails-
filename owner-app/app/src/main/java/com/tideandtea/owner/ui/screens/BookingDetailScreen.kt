@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Directions
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -92,6 +93,7 @@ fun BookingDetailScreen(
     vm: OwnerViewModel,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
+    onChat: () -> Unit,
 ) {
     val ctx = LocalContext.current
     var viewer by remember { mutableStateOf<Pair<List<String>, Int>?>(null) }
@@ -109,7 +111,7 @@ fun BookingDetailScreen(
     ) { pad ->
         if (booking == null) {
             Column(Modifier.fillMaxSize().padding(pad), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Bunny(80.dp); Text("This booking was removed.", style = MaterialTheme.typography.bodyLarge)
+                Bunny(80.dp, hop = true); Text("Loading booking…", style = MaterialTheme.typography.bodyLarge)
             }
             return@Scaffold
         }
@@ -136,6 +138,9 @@ fun BookingDetailScreen(
                         OutlinedButton(onClick = { ctx.open(b.whatsappUrl) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Outlined.Chat, null, Modifier.size(18.dp)); Text("  WhatsApp")
                         }
+                    }
+                    Button(onClick = onChat, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Pink, contentColor = Plum)) {
+                        Icon(Icons.Outlined.Forum, null, Modifier.size(18.dp)); Text("  Message in app")
                     }
                 }
             }
@@ -223,7 +228,7 @@ private fun PhotoRow(urls: List<String>, onOpen: (Int) -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhotoViewer(urls: List<String>, start: Int, onClose: () -> Unit) {
+internal fun PhotoViewer(urls: List<String>, start: Int, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         val pager = rememberPagerState(initialPage = start) { urls.size }
         Box(Modifier.fillMaxSize().background(Plum)) {
@@ -297,7 +302,11 @@ private fun Actions(b: Booking, vm: OwnerViewModel) {
         }
         BookingStatus.CONFIRMED -> Section("Confirmed") {
             Text("Advance received. Balance due on the day: ${money(b.price.total - b.price.advance)}.", style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = { vm.act("Marked as done") { markDone(b) } }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("Mark as done") }
+            Text("When the appointment is finished, record how the balance was paid:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = { vm.act("Done. Balance recorded as cash") { markDone(b, "Cash") } }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("Paid in cash") }
+                Button(onClick = { vm.act("Done. Balance recorded as UPI") { markDone(b, "UPI") } }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("Paid by UPI") }
+            }
         }
         BookingStatus.COMPLETED -> Section { Text("Done. Hope they loved their nails!", style = MaterialTheme.typography.bodyMedium) }
         BookingStatus.DECLINED -> Section { Text("Declined. ${b.ownerNote}", style = MaterialTheme.typography.bodyMedium) }
