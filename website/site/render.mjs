@@ -701,7 +701,7 @@ export function policies(c) {
 
 export function book(c, partial) {
   const body = `${pageHead("Book online", "Book your *set*", "Takes about two minutes. Nothing is charged until we approve your request.", `<div class="hero-cta"><a class="btn btn-ghost btn-sm" href="#mine" id="navMine" hidden>My bookings</a><a class="btn btn-ghost btn-sm" href="#prices">Price list</a></div>`)}
-${partial.replace('id="book"', `id="book" data-area="${esc(serviceArea(c))}"`)}`;
+${partial.replace('id="book"', `id="book" data-area="${esc(serviceArea(c))}" data-wa="${esc(c.site.contact.whatsapp || c.site.contact.phone || "")}"`)}`;
   return {
     path: "/book/",
     html: layout(c, {

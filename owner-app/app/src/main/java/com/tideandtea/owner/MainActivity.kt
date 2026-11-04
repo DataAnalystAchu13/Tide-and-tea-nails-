@@ -14,7 +14,6 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Language
@@ -46,8 +45,6 @@ import com.tideandtea.owner.data.BookingStatus
 import com.tideandtea.owner.shop.ShopViewModel
 import com.tideandtea.owner.shop.shopGraph
 import com.tideandtea.owner.ui.screens.BookingDetailScreen
-import com.tideandtea.owner.ui.screens.ChatScreen
-import com.tideandtea.owner.ui.screens.ChatsScreen
 import com.tideandtea.owner.ui.screens.InsightsScreen
 import com.tideandtea.owner.ui.screens.LoginScreen
 import com.tideandtea.owner.ui.screens.PaymentsScreen
@@ -86,7 +83,6 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val TABS = listOf(
     Tab("list", "Requests", Icons.Outlined.Inbox),
     Tab("orders", "Orders", Icons.Outlined.ShoppingBag),
-    Tab("chats", "Chats", Icons.Outlined.Forum),
     Tab("website", "Website", Icons.Outlined.Language),
     Tab("insights", "Insights", Icons.Outlined.Insights),
 )
@@ -115,7 +111,6 @@ fun OwnerApp(vm: OwnerViewModel, shop: ShopViewModel) {
 private fun SignedInApp(vm: OwnerViewModel, shop: ShopViewModel, snackbar: SnackbarHostState) {
     val bookings by vm.bookings.collectAsStateWithLifecycle()
     val payments by vm.payments.collectAsStateWithLifecycle()
-    val chats by vm.chats.collectAsStateWithLifecycle()
     val orders by shop.orders.collectAsStateWithLifecycle()
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
@@ -129,12 +124,11 @@ private fun SignedInApp(vm: OwnerViewModel, shop: ShopViewModel, snackbar: Snack
     LaunchedEffect(vm.pendingOpen) {
         val target = vm.pendingOpen ?: return@LaunchedEffect
         val (type, id) = target.split(":", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
-        nav.navigate(when (type) { "chat" -> "chat/$id"; "order" -> "order/$id"; else -> "booking/$id" })
+        nav.navigate(when (type) { "order" -> "order/$id"; else -> "booking/$id" })
         vm.pendingOpen = null
     }
 
     val newCount = bookings?.count { it.status == BookingStatus.REQUESTED || it.status == BookingStatus.PAYMENT_SUBMITTED } ?: 0
-    val unreadChats = chats.count { it.ownerUnread > 0 }
     val ordersToDo = orders?.count { it.needsAction } ?: 0
 
     Scaffold(
@@ -143,7 +137,7 @@ private fun SignedInApp(vm: OwnerViewModel, shop: ShopViewModel, snackbar: Snack
             if (route in TABS.map { it.route }) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     TABS.forEach { t ->
-                        val badge = when (t.route) { "list" -> newCount; "orders" -> ordersToDo; "chats" -> unreadChats; "website" -> if (shop.unpublished) 1 else 0; else -> 0 }
+                        val badge = when (t.route) { "list" -> newCount; "orders" -> ordersToDo; "website" -> if (shop.unpublished) 1 else 0; else -> 0 }
                         NavigationBarItem(
                             selected = route == t.route,
                             onClick = {
@@ -177,7 +171,6 @@ private fun SignedInApp(vm: OwnerViewModel, shop: ShopViewModel, snackbar: Snack
                     onSignOut = vm::signOut,
                 )
             }
-            composable("chats") { ChatsScreen(chats) { id -> nav.navigate("chat/$id") } }
             composable("insights") { InsightsScreen(bookings, payments) { nav.navigate("payments") } }
             composable("payments") {
                 PaymentsScreen(payments, onBack = { nav.popBackStack() }) { p ->
@@ -195,18 +188,6 @@ private fun SignedInApp(vm: OwnerViewModel, shop: ShopViewModel, snackbar: Snack
                     vm = vm,
                     snackbar = snackbar,
                     onBack = { nav.popBackStack() },
-                    onChat = { nav.navigate("chat/$id") },
-                )
-            }
-            composable("chat/{id}") { e ->
-                val id = e.arguments?.getString("id") ?: ""
-                ChatScreen(
-                    bookingId = id,
-                    booking = bookings?.firstOrNull { it.id == id },
-                    vm = vm,
-                    snackbar = snackbar,
-                    onBack = { nav.popBackStack() },
-                    onOpenBooking = { nav.navigate("booking/$id") },
                 )
             }
         }
