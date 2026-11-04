@@ -1,10 +1,11 @@
 # Tide & Tea Nails: booking website + owner app
 
-Two parts share one Firebase project:
+Two parts share one **Supabase** project (database, logins, photo storage, live updates). Firebase is used only on its free plan, to host the website and to send push notifications to your phone.
 
 | Part | Who uses it | Folder |
 |---|---|---|
 | Booking website | Customers | `website/` (deploys to Firebase Hosting) |
+| Database, security and push function | Both | `supabase/` (deploys to Supabase) |
 | Studio app (Android) | You, the owner | `owner-app/` (open in Android Studio) |
 
 ## How a booking flows
@@ -18,69 +19,59 @@ Two parts share one Firebase project:
 
 Your phone gets a push notification for every new request, every advance a client says they've paid, and every chat message. Clients can chat with you from their booking on the website and send photos and short videos (up to 60 MB); you reply from the **Chats** tab. **Insights** shows money collected, requests, approval rate, average booking, a weekly chart and your most requested sets.
 
-## One-time setup (about 30 minutes)
+## One-time setup (about 40 minutes, no card needed)
 
-### 1. Firebase project
-1. Go to https://console.firebase.google.com and create a project (for example `tide-and-tea`).
-2. Switch the project to the **Blaze** plan. Photo uploads use Cloud Storage, which new Firebase projects can only turn on with Blaze. A small studio stays inside the free allowance, but set a budget alert (for example ₹500) under Billing to be safe.
-
-### 2. Sign-in
-Firebase console → **Authentication** → Sign-in method:
-- Turn on **Anonymous** (customers book without making an account).
-- Turn on **Email/Password**.
-- Under **Users**, click **Add user** and create your studio login (your email and a strong password). Copy the **User UID** shown in the list.
-
-### 3. Database and photo storage
-1. **Firestore Database** → Create database → choose the region closest to you (for India: `asia-south1`) → start in production mode.
-2. In Firestore, click **Start collection**, name it `owners`. Use your **User UID** from step 2 as the document ID, and add one field `role` = `owner`. This is what lets your login see bookings. Add more UIDs later for team members.
-3. **Storage** → Get started (same region).
-
-### 4. Google Maps key (for the location step on the website)
-1. Open https://console.cloud.google.com, select the same project.
-2. Enable **Maps JavaScript API**, **Places API (New)** and **Geocoding API**.
-3. Credentials → Create API key. Restrict it to **Websites**: `https://YOUR-PROJECT.web.app/*` and `https://YOUR-PROJECT.firebaseapp.com/*` (plus your own domain if you add one).
-Without a key the site still works: customers tap **Use my current location** and type their address, but there's no map or address search.
-
-### 5. Put the website online
-1. Firebase console → Project settings → **Your apps** → add a **Web** app. Copy the `firebaseConfig` values into `website/public/config.js`, and paste the Maps key into `MAPS_API_KEY`.
-2. On your computer, install Node.js, then run:
+### 1. Supabase project (the database)
+1. Sign up at https://supabase.com and create a project named `tide-and-tea-nails`, region **Mumbai (ap-south-1)**. Save the database password in your password manager.
+2. **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins** (customers book without an account). Email is on by default.
+3. **Authentication → Users → Add user → Create new user**: your studio email and a strong password, with **Auto confirm user** ticked.
+4. **SQL Editor**, run this once with your email so your login can see bookings (add team members the same way):
+   ```sql
+   insert into public.owners (user_id) select id from auth.users where email = 'you@example.com';
    ```
-   npm install -g firebase-tools
-   firebase login
-   cd website
-   firebase use --add        # pick your project
-   firebase deploy           # uploads the site and the security rules
-   ```
-3. Your site is live at `https://YOUR-PROJECT.web.app`. Put this link in your Instagram bio.
-4. Turn on push notifications: in the same `website` folder run
-   ```
-   cd functions && npm install && cd ..
-   firebase deploy --only functions
-   ```
-   This uploads three small Cloud Functions that notify your phone. They run in `asia-south1` (Mumbai); change the region at the top of `functions/index.js` if your database is elsewhere. They stay well inside the free allowance for a studio.
+   Run it after step 3 below, once the first deploy has created the tables.
+5. **Project Settings → API**: copy the **Project URL** and the **anon public** key into `website/public/config.js` and `owner-app/app/src/main/java/com/tideandtea/owner/data/SupabaseConfig.kt`. Both are safe to publish. Never put the `service_role` key anywhere in the code.
 
-### 6. Build the studio app
-1. Firebase console → Project settings → add an **Android** app with package name `com.tideandtea.owner`. Download `google-services.json` and put it in `owner-app/app/`.
-2. Open the `owner-app` folder in Android Studio, let it sync, plug in your phone (USB debugging on), and press **Run**.
-3. Sign in with the email and password from step 2.
-4. Allow notifications when the app asks.
-5. Tap **⋮ → Publish starter price list** once. This copies the starter prices to Firestore so the website shows them.
+### 2. Firebase project (free Spark plan: website hosting + push only)
+1. https://console.firebase.google.com → create a project named `tide-and-tea-nails`. Stay on the free **Spark** plan.
+2. Project settings → **Your apps** → add an **Android** app with package `com.tideandtea.owner`. Download `google-services.json` into `owner-app/app/`.
+3. Project settings → **Service accounts** → **Generate new private key**. In Supabase → **Edge Functions → Secrets**, add a secret named `FCM_SERVICE_ACCOUNT` and paste the whole JSON file as its value. This lets Supabase send push notifications to your phone. Delete the downloaded file afterwards.
 
-### 7. Connect tideandteanails.in
-1. Firebase console → **Hosting** → **Add custom domain** → enter `tideandteanails.in` (then add `www.tideandteanails.in` and choose to redirect it to the main domain).
-2. Firebase shows a **TXT** record and one or two **A** records. Log in to the company you bought the domain from (GoDaddy, Hostinger, BigRock and so on), open DNS settings for tideandteanails.in, and add exactly those records. Remove any old A records for `@`.
-3. Wait for Firebase to show **Connected** (usually under an hour, sometimes up to 24). The SSL certificate is set up automatically.
-4. Add `https://tideandteanails.in/*` to the Maps API key's website restrictions (step 4).
+### 3. Automatic deploys from GitHub
+GitHub repo → Settings → Secrets and variables → Actions → **New repository secret**:
 
-### 8. Automatic deploys from GitHub (optional)
-The workflow in `.github/workflows/deploy-website.yml` republishes the site every time `website/` changes on `main`.
-1. Google Cloud console → IAM → Service accounts → create one with the **Firebase Hosting Admin** role → Keys → Add key → JSON.
-2. GitHub repo → Settings → Secrets and variables → Actions → add `FIREBASE_SERVICE_ACCOUNT` (paste the whole JSON) and `FIREBASE_PROJECT_ID`.
-Security rules still deploy with `firebase deploy` from your computer.
+| Secret | Where to get it |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | supabase.com/dashboard/account/tokens → Generate new token |
+| `SUPABASE_PROJECT_REF` | the part before `.supabase.co` in your Project URL |
+| `SUPABASE_DB_PASSWORD` | the database password from step 1 |
+| `FIREBASE_SERVICE_ACCOUNT` | Google Cloud console → IAM → Service accounts → create one with the **Firebase Hosting Admin** role → Keys → Add key → JSON (paste the whole file) |
+| `FIREBASE_PROJECT_ID` | `tide-and-tea-nails` (or the ID Firebase gave your project) |
+
+Then **Actions → Deploy Supabase → Run workflow** and **Deploy website → Run workflow**. From then on, every change merged to `main` deploys itself:
+- `supabase/` changes apply the database tables, security policies, photo storage and the push function.
+- `website/` changes publish the site to `https://<project>.web.app`.
+
+### 4. Google Maps key (location step on the website)
+1. https://console.cloud.google.com, select the Firebase project.
+2. Enable **Maps JavaScript API**, **Places API (New)** and **Geocoding API**. Maps has a monthly free allowance; Google asks for a card only to switch the key on.
+3. Credentials → Create API key → restrict to **Websites**: `https://tideandteanails.in/*`, `https://www.tideandteanails.in/*`, `https://<project>.web.app/*`. Paste it into `MAPS_API_KEY` in `website/public/config.js`.
+Without a key the site still works: customers tap **Use my current location** and type their address.
+
+### 5. Build the studio app
+1. Open the `owner-app` folder in Android Studio, let it sync, plug in your phone (USB debugging on), and press **Run**.
+2. Sign in with the email and password from step 1.3. Allow notifications when asked.
+3. The starter price list is already in the database (Table Editor → `config` → `main`).
+
+### 6. Connect tideandteanails.in
+1. Firebase console → **Hosting** → **Add custom domain** → `tideandteanails.in`, then add `www.tideandteanails.in` and redirect it to the main domain.
+2. Firebase shows a **TXT** record and one or two **A** records. At the company you bought the domain from, open DNS settings for tideandteanails.in, add exactly those records, and remove any old A records for `@`.
+3. Wait for Firebase to show **Connected** (usually under an hour, up to 24). SSL is set up automatically.
+4. Supabase → **Authentication → URL Configuration**: set Site URL to `https://tideandteanails.in`.
 
 ## Changing prices, slots, studio location and UPI ID
 
-Everything customers see lives in one Firestore document: **config/main**. Edit it in the Firebase console and the website updates instantly, no redeploy needed.
+Everything customers see lives in one database row: Supabase → **Table Editor → `config` → `main` → `data`**. Edit the JSON there and the website updates instantly, no redeploy needed.
 
 | Field | What it controls |
 |---|---|
@@ -95,6 +86,8 @@ All starter prices are placeholders I made up. Replace them with your real price
 
 ## Good to know
 - Customers' bookings are tied to the browser they booked from. If they switch phones, they can still reach you on WhatsApp; you see everything in the app.
-- Chat photos and videos are stored in Firebase Storage under `chats/`. Videos are uploaded as-is, so ask clients for short clips.
+- Inspo photos are stored in the Supabase `bookings` bucket and chat photos and videos in the `chats` bucket. Files sit under random IDs, so a link only works for someone who was given it, the same model as Instagram DM media. Videos are uploaded as-is, so ask clients for short clips. The free plan includes 1 GB of storage.
 - Payment history only counts money you confirm in the app (advances when you tap **Confirm booking**, balances when you mark a booking done).
-- Security rules (`website/firestore.rules`, `website/storage.rules`) make sure customers only see their own booking, can only add a payment reference after approval, and only owner accounts can read other customers' details, addresses, photo links, chats and payment history. A client can only read and write the chat for their own booking.
+- Row-level security in `supabase/migrations/` makes sure customers only see their own booking, can only add a payment reference after approval, and only owner accounts can read other customers' details, addresses, photo links, chats and payment history. A client can only read and write the chat for their own booking.
+- Taken slots, payment history and chat summaries are written by the database itself (triggers), so they stay correct even if the app is closed mid-way.
+- Supabase pauses free projects after 7 days with no activity at all. Any booking, app sign-in or website visit that loads prices counts as activity.

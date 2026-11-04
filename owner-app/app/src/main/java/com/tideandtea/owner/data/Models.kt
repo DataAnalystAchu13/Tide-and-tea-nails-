@@ -1,13 +1,13 @@
 package com.tideandtea.owner.data
 
-import com.google.firebase.Timestamp
-import com.google.firebase.firestore.DocumentSnapshot
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Mirrors the documents the customer website writes to Firestore at bookings/{id}. */
+/** Mirrors public.bookings in Supabase (see supabase/migrations). */
 enum class BookingStatus(val key: String, val label: String) {
     REQUESTED("requested", "New request"),
     APPROVED("approved", "Awaiting advance"),
@@ -76,55 +76,50 @@ data class Booking(
         }
 
     companion object {
-        fun from(doc: DocumentSnapshot): Booking {
-            val d: Map<String, Any?> = doc.data ?: emptyMap()
-            val loc = d["location"] as? Map<*, *>
-            val p = d["price"] as? Map<*, *>
+        fun from(r: JsonObject): Booking {
+            val loc = r.obj("location")
+            val p = r.obj("price")
             return Booking(
-                id = doc.id,
-                customerUid = d.str("customerUid"),
-                name = d.str("name"),
-                phone = d.str("phone"),
-                from = d.str("from"),
-                instagram = d.str("instagram"),
-                notes = d.str("notes"),
-                extension = item(d["extension"]),
-                length = item(d["length"]),
-                shape = d.str("shape"),
-                addOns = (d["addOns"] as? List<*>)?.mapNotNull { item(it) } ?: emptyList(),
-                date = d.str("date"),
-                slot = d.str("slot"),
-                isHomeVisit = d.str("serviceMode") != "studio",
+                id = r.str("id"),
+                customerUid = r.str("customer_uid"),
+                name = r.str("name"),
+                phone = r.str("phone"),
+                from = r.str("from_place"),
+                instagram = r.str("instagram"),
+                notes = r.str("notes"),
+                extension = r["extension"]?.let(::item),
+                length = r["length"]?.let(::item),
+                shape = r.str("shape"),
+                addOns = r.list("add_ons").mapNotNull(::item),
+                date = r.str("date"),
+                slot = r.str("slot"),
+                isHomeVisit = r.str("service_mode") == "home",
                 place = loc?.let {
-                    val lat = (it["lat"] as? Number)?.toDouble()
-                    val lng = (it["lng"] as? Number)?.toDouble()
-                    if (lat != null && lng != null) Place(lat, lng, it["address"] as? String ?: "") else null
+                    val lat = it.strOrNull("lat")?.toDoubleOrNull()
+                    val lng = it.strOrNull("lng")?.toDoubleOrNull()
+                    if (lat != null && lng != null) Place(lat, lng, it.str("address")) else null
                 },
-                distanceKm = (d["distanceKm"] as? Number)?.toDouble() ?: 0.0,
-                inspoUrls = d.strings("inspoUrls"),
-                naturalUrls = d.strings("naturalUrls"),
+                distanceKm = r.double("distance_km"),
+                inspoUrls = r.strings("inspo_urls"),
+                naturalUrls = r.strings("natural_urls"),
                 price = Price(
-                    base = p?.get("base").asInt(),
-                    length = p?.get("length").asInt(),
-                    addOns = p?.get("addOns").asInt(),
-                    travel = p?.get("travel").asInt(),
-                    total = p?.get("total").asInt(),
-                    advance = p?.get("advance").asInt(),
+                    base = p?.int("base") ?: 0,
+                    length = p?.int("length") ?: 0,
+                    addOns = p?.int("addOns") ?: 0,
+                    travel = p?.int("travel") ?: 0,
+                    total = p?.int("total") ?: 0,
+                    advance = p?.int("advance") ?: 0,
                 ),
-                status = BookingStatus.from(d["status"] as? String),
-                ownerNote = d.str("ownerNote"),
-                paymentRef = d.str("paymentRef"),
-                createdAtMillis = (d["createdAt"] as? Timestamp)?.toDate()?.time ?: 0L,
+                status = BookingStatus.from(r.strOrNull("status")),
+                ownerNote = r.str("owner_note"),
+                paymentRef = r.str("payment_ref"),
+                createdAtMillis = r.millis("created_at"),
             )
         }
 
-        private fun Map<String, Any?>.str(key: String): String = this[key] as? String ?: ""
-        private fun Map<String, Any?>.strings(key: String): List<String> =
-            (this[key] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-        private fun Any?.asInt(): Int = (this as? Number)?.toInt() ?: 0
-        private fun item(raw: Any?): PriceItem? {
-            val m = raw as? Map<*, *> ?: return null
-            return PriceItem(m["id"] as? String ?: "", m["name"] as? String ?: "", m["price"].asInt())
+        private fun item(raw: JsonElement): PriceItem? {
+            val m = raw.asObjectOrNull() ?: return null
+            return PriceItem(m.str("id"), m.str("name"), m.int("price"))
         }
     }
 }
