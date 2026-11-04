@@ -986,3 +986,39 @@ h2 { color: var(--ink); }
   .svc-grid .svc:nth-child(3n+2) { background: #f8eef6; }
   .svc-grid .svc:nth-child(3n) { background: #f1ecf8; }
 }
+
+/* =====================================================================
+   Visual QA fixes (Nov 2026 audit): contrast, tap targets, tiny text,
+   overlapping sparkles, orphan cards and the split drop cap.
+   ===================================================================== */
+:root { --pink-deep: #6f5b98; --lilac-ink: #5a4882; }   /* lilac text that passes 4.5:1 on white */
+.hero .eyebrow, .pagehead .eyebrow, .foot-h { color: var(--lilac-ink); }
+.site-foot .hours li span:last-child { color: var(--ink); font-weight: 700; }
+
+/* 44px tap targets */
+.more { display: inline-flex; align-items: center; gap: .45em; min-height: 44px; }
+.foot-links { gap: 0; }
+.foot-links a { display: inline-flex; align-items: center; min-height: 40px; }
+.site-head .btn-sm { min-height: 44px; font-size: .76rem; }
+.chip span { min-height: 44px; }
+.sizing-mini summary { padding: 10px 0; }
+.crumbs a { display: inline-block; padding: 10px 0; }
+.qty input { min-height: 40px; }
+
+/* No text under 11px */
+.badge { font-size: .72rem; }
+.pcard-custom-cta { font-size: .72rem; }
+@media (max-width: 600px) { .badge { font-size: .7rem; } }
+
+/* Sparkles never sit on top of the intro text */
+@media (max-width: 760px) { .pagehead .sp3 { display: none; } }
+
+/* Five services fit one row on desktop instead of 4 + 1 */
+@media (min-width: 761px) { .svc-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); } }
+
+/* "My" was split by the drop cap ("M  y"): plain first letter reads better */
+.letter .prose p:first-child::first-letter { font: inherit; float: none; margin: 0; color: inherit; }
+
+/* Contact: map card matches the cards beside it instead of towering over them */
+@media (min-width: 761px) { .mapframe { align-self: start; min-height: 0; } .mapframe iframe { min-height: 300px; } }
+.site-foot .copy { color: var(--muted); }
