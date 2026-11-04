@@ -138,7 +138,7 @@ h3 { font-size: 1.45rem; }
 .bunny-peek { width: 96px; height: 104px; flex: none; position: relative; z-index: 4; margin-bottom: -16px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
 .booker { position: relative; padding: 20px; }
-.stepper { list-style: none; margin: 0 0 20px; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.stepper { list-style: none; margin: 0 0 20px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .stepper li { display: grid; gap: 6px; font-size: .78rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .stepper li::before { content: ""; height: 6px; border-radius: 6px; background: var(--lilac); }
 .stepper li.done::before { background: var(--pink); }
@@ -722,3 +722,21 @@ body.sheet-open { overflow: hidden; }
 .site-foot .hours li span:last-child { color: var(--pink); }
 .review blockquote { font: 400 1.02rem/1.5 var(--body); }
 @media (max-width: 760px) { .how li { padding: 14px; } .how span { font-size: .86rem; } }
+
+/* ---------- Shorter booking flow: step count, recap, optional extras ---------- */
+.stepper { margin-bottom: 8px; }
+.step-count { margin: 0 0 18px; font-size: .85rem; font-weight: 700; }
+.recap { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 16px; padding: 10px 14px;
+  border-radius: var(--r-md); background: var(--lilac); color: var(--royal); font-size: .9rem; }
+.recap span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recap b { flex: none; }
+details.extra { border: 1px dashed var(--line); border-radius: var(--r-md); padding: 0 14px; }
+details.extra > summary { list-style: none; cursor: pointer; padding: 14px 0; font-weight: 800; color: var(--royal);
+  display: flex; align-items: center; gap: 8px; }
+details.extra > summary::-webkit-details-marker { display: none; }
+details.extra > summary::before { content: "+"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--lilac); color: var(--royal); font-weight: 900; }
+details.extra[open] > summary::before { content: "−"; }
+details.extra > summary .opt { font-weight: 600; color: var(--muted); }
+details.extra { margin-bottom: 22px; }
+details.extra[open] { padding-bottom: 4px; }

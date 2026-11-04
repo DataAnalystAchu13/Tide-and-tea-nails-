@@ -160,7 +160,8 @@ async function shrink(file, max = 1600, quality = 0.85) {
 /* State                                                               */
 /* ------------------------------------------------------------------ */
 
-const STEPS = ["Your set", "Date", "Location", "Photos", "You"];
+const STEPS = ["Your set", "Time", "Place", "Inspo"];
+const STEP_LEFT = ["About 2 minutes", "About a minute left", "Nearly there", "Last step"];
 let step = 0;
 let backend = null;
 let takenOff = null;
@@ -188,7 +189,7 @@ function loadDraft() {
     const raw = sessionStorage.getItem("tide.draft"); if (!raw) return;
     const { step: s, rest } = JSON.parse(raw);
     draft = { ...freshDraft(), ...rest };
-    step = Math.min(s || 0, 3);
+    step = Math.min(s || 0, STEPS.length - 1);
   } catch {}
 }
 
@@ -224,6 +225,7 @@ function renderStepper() {
     `<li class="${i < step ? "done" : ""} ${i === step ? "now" : ""}" ${i === step ? 'aria-current="step"' : ""}>${esc(s)}</li>`).join("");
   $("#backBtn").style.visibility = step === 0 ? "hidden" : "visible";
   $("#nextBtn").textContent = step === STEPS.length - 1 ? "Send request" : "Next";
+  const c = $("#stepCount"); if (c) c.textContent = `Step ${step + 1} of ${STEPS.length} · ${STEP_LEFT[step]}`;
 }
 
 function updateTotal() {
@@ -239,16 +241,23 @@ function renderStep() {
   if (step === 0) body.innerHTML = stepSet();
   if (step === 1) { body.innerHTML = stepDate(); watchTaken(); }
   if (step === 2) { body.innerHTML = stepLocation(); mountLocation(); }
-  if (step === 3) { body.innerHTML = stepPhotos(); renderThumbs(); }
-  if (step === 4) body.innerHTML = stepYou();
+  if (step === 3) { body.innerHTML = stepFinish(); renderThumbs(); }
   updateTotal();
   saveDraft();
 }
 
+/** One line recap of what's chosen so far, shown above later steps. */
+function recap() {
+  const bits = [draft.extension?.name, draft.length?.name, draft.shape, draft.date && `${prettyDate(draft.date)}${draft.slot ? ", " + slotLabel(draft.slot) : ""}`].filter(Boolean);
+  return bits.length ? `<p class="recap"><span>${bits.map(esc).join(" · ")}</span><b>${money(quote(cfg, draft).total)}</b></p>` : "";
+}
+
 function stepSet() {
+  if (!draft.length && cfg.lengths.length) draft.length = cfg.lengths[0];
+  const extras = Boolean(draft.shape || draft.addOns.length);
   return `
   <h3 class="step-title">Choose your set</h3>
-  <p class="step-sub">Not sure which extension suits you? Pick the closest one. We'll suggest the best option after seeing your nails.</p>
+  <p class="step-sub">Not sure? Pick the closest one. We'll suggest the best option after seeing your nails.</p>
   <div class="group" role="radiogroup" aria-label="Extension type">
     <span class="label">Extension type</span>
     <div class="choice-grid">
@@ -264,25 +273,29 @@ function stepSet() {
       <label class="chip"><input type="radio" name="len" value="${esc(l.id)}" ${draft.length?.id === l.id ? "checked" : ""}><span>${esc(l.name)}${l.price ? ` <i>+${money(l.price)}</i>` : ""}</span></label>`).join("")}
     </div>
   </div>
+  <details class="extra" ${extras ? "open" : ""}>
+  <summary>Shape and add-ons <span class="opt">(optional)</span></summary>
   <div class="group">
-    <span class="label">Shape <span class="opt">(optional)</span></span>
+    <span class="label">Shape</span>
     <div class="chips">${cfg.shapes.map((s) => `
       <label class="chip"><input type="radio" name="shape" value="${esc(s)}" ${draft.shape === s ? "checked" : ""}><span>${esc(s)}</span></label>`).join("")}
     </div>
   </div>
   <div class="group">
-    <span class="label">Add-ons <span class="opt">(optional)</span></span>
+    <span class="label">Add-ons</span>
     <div class="chips">${cfg.addOns.map((a) => `
       <label class="chip"><input type="checkbox" name="addon" value="${esc(a.id)}" ${draft.addOns.some((x) => x.id === a.id) ? "checked" : ""}><span>${esc(a.name)} <i>${addOnPrice(a).replace("Price varies", "price varies")}</i></span></label>`).join("")}
     </div>
-  </div>`;
+  </div>
+  </details>`;
 }
 
 function stepDate() {
   const dates = openDates();
   return `
+  ${recap()}
   <h3 class="step-title">Pick a date and time</h3>
-  <p class="step-sub">Greyed-out times are already booked. Your slot is held once your advance is paid.</p>
+  <p class="step-sub">Greyed-out times are already booked.</p>
   <div class="group">
     <span class="label">Date</span>
     <div class="dates" role="radiogroup" aria-label="Date">
@@ -299,9 +312,11 @@ function stepDate() {
   </div>`;
 }
 
+function slotLabel(t) { const [h, m] = t.split(":").map(Number); const d = new Date(); d.setHours(h, m); return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); }
+
 function slotChips() {
   if (!draft.date) return `<span class="muted">Choose a date first.</span>`;
-  const label = (t) => { const [h, m] = t.split(":").map(Number); const d = new Date(); d.setHours(h, m); return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); };
+  const label = slotLabel;
   return cfg.slots.map((t) => {
     const busy = taken.includes(t);
     return `<label class="chip"><input type="radio" name="slot" value="${esc(t)}" ${busy ? "disabled" : ""} ${draft.slot === t && !busy ? "checked" : ""}><span>${label(t)}${busy ? " <i>booked</i>" : ""}</span></label>`;
@@ -322,6 +337,7 @@ function watchTaken() {
 function stepLocation() {
   const s = cfg.studio;
   return `
+  ${recap()}
   <h3 class="step-title">Where are you?</h3>
   <p class="step-sub">We come to you anywhere in ${esc(document.getElementById("book")?.dataset.area || "Chennai and Chengalpattu")}, or you can visit the studio.</p>
   <div class="mode-toggle group" role="radiogroup" aria-label="Visit type">
@@ -556,21 +572,44 @@ function useGps() {
   navigator.geolocation.getCurrentPosition(ok, (e) => fail(e, false), { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
 }
 
-function stepPhotos() {
+function stepFinish() {
+  const q = quote(cfg, draft);
+  const row = (k, v) => `<div class="sumrow"><span>${k}</span><span>${v}</span></div>`;
+  const extras = Boolean(draft.natural.length || draft.instagram || draft.notes);
   return `
-  <h3 class="step-title">Show us the vibe</h3>
-  <p class="step-sub">Add as many inspo pictures as you like (up to ${MAX_INSPO}). Photos of your natural nails help us pick the right extension.</p>
+  <h3 class="step-title">Your inspo and number</h3>
+  <p class="step-sub">We look at your inspo, then confirm the price on WhatsApp. Nothing is charged now.</p>
   <div class="group">
     <span class="label">Inspo pictures</span>
     <label class="drop" data-kind="inspo"><input type="file" accept="image/*" multiple data-kind="inspo">
-      <b>Add inspo pics</b><small>Screenshots from Instagram or Pinterest are perfect</small></label>
+      <b>Add inspo pics</b><small>Screenshots from Instagram or Pinterest are perfect (up to ${MAX_INSPO})</small></label>
     <div class="thumbs" id="thumbs-inspo"></div>
   </div>
-  <div class="group">
-    <span class="label">Your natural nails <span class="opt">(optional, if you're comfortable)</span></span>
-    <label class="drop" data-kind="natural"><input type="file" accept="image/*" multiple data-kind="natural">
-      <b>Add photos of your nails</b><small>Both hands, in daylight, nails facing the camera</small></label>
-    <div class="thumbs" id="thumbs-natural"></div>
+  <div class="fields group">
+    <div class="field"><label for="name">Your name</label><input id="name" autocomplete="name" value="${esc(draft.name)}" required></div>
+    <div class="field"><label for="phone">WhatsApp number</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number" value="${esc(draft.phone)}" required></div>
+  </div>
+  <details class="extra" ${extras ? "open" : ""}>
+    <summary>Add more details <span class="opt">(optional)</span></summary>
+    <div class="group">
+      <span class="label">Your natural nails</span>
+      <label class="drop" data-kind="natural"><input type="file" accept="image/*" multiple data-kind="natural">
+        <b>Add photos of your nails</b><small>Helps us pick the right extension. Both hands, in daylight.</small></label>
+      <div class="thumbs" id="thumbs-natural"></div>
+    </div>
+    <div class="fields">
+      <div class="field"><label for="instagram">Instagram</label><input id="instagram" placeholder="@yourhandle" value="${esc(draft.instagram)}"></div>
+      <div class="field wide"><label for="notes">Anything else?</label><textarea id="notes" placeholder="Allergies, nail concerns, occasion…">${esc(draft.notes)}</textarea></div>
+    </div>
+  </details>
+  <div class="summary" aria-label="Price estimate">
+    ${row(esc(draft.extension?.name || ""), money(q.base))}
+    ${draft.length ? row(`${esc(draft.length.name)} length`, q.length ? money(q.length) : "included") : ""}
+    ${draft.addOns.map((a) => row(esc(a.name), Number(a.price) > 0 ? money(a.price) : "price on approval")).join("")}
+    ${row(draft.mode === "home" ? "Travel" : "Studio visit", draft.mode !== "home" ? "free" : travelByDistance(cfg) ? (q.travel ? money(q.travel) : "free") : "confirmed by owner")}
+    <div class="sumrow total"><span>Estimated total</span><span>${money(q.total)}</span></div>
+    <div class="sumrow adv"><span>Advance after approval (${cfg.advancePercent}%)</span><span>${money(q.advance)}</span></div>
+    <div class="sumrow"><span>${esc(prettyDate(draft.date))} · ${esc(slotLabel(draft.slot || "00:00"))}</span><span>${draft.mode === "home" ? "Home visit" : "Studio"}</span></div>
   </div>`;
 }
 
@@ -590,37 +629,15 @@ function addFiles(kind, files) {
   renderThumbs();
 }
 
-function stepYou() {
-  const q = quote(cfg, draft);
-  const row = (k, v) => `<div class="sumrow"><span>${k}</span><span>${v}</span></div>`;
-  return `
-  <h3 class="step-title">Last bit: about you</h3>
-  <p class="step-sub">We'll message you on WhatsApp once we've reviewed your request.</p>
-  <div class="fields group">
-    <div class="field"><label for="name">Your name</label><input id="name" autocomplete="name" value="${esc(draft.name)}" required></div>
-    <div class="field"><label for="phone">WhatsApp number</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number" value="${esc(draft.phone)}" required></div>
-    <div class="field"><label for="from">Where are you from?</label><input id="from" autocomplete="address-level2" placeholder="Your area or city" value="${esc(draft.from)}" required></div>
-    <div class="field"><label for="instagram">Instagram <span class="opt muted">(optional)</span></label><input id="instagram" placeholder="@yourhandle" value="${esc(draft.instagram)}"></div>
-    <div class="field wide"><label for="notes">Anything else? <span class="opt muted">(optional)</span></label><textarea id="notes" placeholder="Allergies, nail concerns, occasion…">${esc(draft.notes)}</textarea></div>
-  </div>
-  <div class="summary" aria-label="Price estimate">
-    ${row(esc(draft.extension?.name || ""), money(q.base))}
-    ${draft.length ? row(`${esc(draft.length.name)} length`, q.length ? money(q.length) : "included") : ""}
-    ${draft.addOns.map((a) => row(esc(a.name), Number(a.price) > 0 ? money(a.price) : "price on approval")).join("")}
-    ${row(draft.mode === "home" ? "Travel" : "Studio visit", draft.mode !== "home" ? "free" : travelByDistance(cfg) ? (q.travel ? money(q.travel) : "free") : "confirmed by owner")}
-    <div class="sumrow total"><span>Estimated total</span><span>${money(q.total)}</span></div>
-    <div class="sumrow adv"><span>Advance after approval (${cfg.advancePercent}%)</span><span>${money(q.advance)}</span></div>
-    <div class="sumrow"><span>${esc(prettyDate(draft.date))} · ${esc(draft.slot)}</span><span>${draft.inspo.length} inspo · ${draft.natural.length} nail pics</span></div>
-  </div>`;
-}
-
 /* ------------------------------------------------------------------ */
 /* Validation and navigation                                           */
 /* ------------------------------------------------------------------ */
 
 function collect() {
-  if (step === 4) {
-    for (const k of ["name", "phone", "from", "instagram", "notes"]) { const el = $("#" + k); if (el) draft[k] = el.value.trim(); }
+  if (step === 3) {
+    for (const k of ["name", "phone", "instagram", "notes"]) { const el = $("#" + k); if (el) draft[k] = el.value.trim(); }
+    // "Where are you from" is no longer asked: the area comes from the address (or the studio).
+    draft.from = draft.mode === "home" ? areaOf(draft.address) : "Studio visit";
   }
   if (step === 2) { const a = $("#address"); if (a) draft.address = a.value.trim(); }
 }
@@ -638,13 +655,19 @@ function validate() {
     if (draft.lat == null) return "Tap “Use my current location”, search your area, or tap the map so we can find you.";
     if (draft.address.length < 8) return "Add your full address so we can find your door.";
   }
-  if (step === 3 && draft.inspo.length === 0) return "Add at least one inspo picture.";
-  if (step === 4) {
+  if (step === 3) {
+    if (draft.inspo.length === 0) return "Add at least one inspo picture.";
     if (!draft.name) return "Add your name.";
     if (draft.phone.replace(/\D/g, "").length < 10) return "Add a WhatsApp number with at least 10 digits.";
-    if (!draft.from) return "Tell us where you're from.";
   }
   return "";
+}
+
+/** A short area name from a typed address: the last part that isn't a PIN code, city or state. */
+function areaOf(address) {
+  const skip = /^(chennai|tamil nadu|india|chengalpattu|\d{6}|tn)$/i;
+  const parts = String(address || "").split(/[,\n]/).map((x) => x.trim().replace(/\s*-?\s*\d{6}$/, "")).filter((x) => x && !skip.test(x));
+  return (parts.length > 1 ? parts[parts.length - 1] : parts[0] || "").slice(0, 120);
 }
 
 function showError(m) {
