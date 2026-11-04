@@ -128,7 +128,7 @@ private fun SignedInApp(vm: OwnerViewModel, shop: ShopViewModel, snackbar: Snack
         vm.pendingOpen = null
     }
 
-    val newCount = bookings?.count { it.status == BookingStatus.REQUESTED || it.status == BookingStatus.PAYMENT_SUBMITTED } ?: 0
+    val newCount = bookings?.count { it.status == BookingStatus.REQUESTED || it.status == BookingStatus.PAYMENT_SUBMITTED || it.refundDue } ?: 0
     val ordersToDo = orders?.count { it.needsAction } ?: 0
 
     Scaffold(

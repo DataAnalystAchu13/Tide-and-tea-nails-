@@ -75,6 +75,7 @@ private val FILTERS = listOf(
     Filter("Paid · confirm", setOf(BookingStatus.PAYMENT_SUBMITTED)),
     Filter("Not paid yet", setOf(BookingStatus.REQUESTED, BookingStatus.APPROVED)),
     Filter("Upcoming", setOf(BookingStatus.CONFIRMED)),
+    Filter("Cancelled", setOf(BookingStatus.CANCELLED, BookingStatus.DECLINED)),
     Filter("All", null),
 )
 

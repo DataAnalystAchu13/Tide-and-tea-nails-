@@ -36,6 +36,7 @@ fun statusColors(s: BookingStatus): PillColors = when (s) {
     BookingStatus.PAYMENT_SUBMITTED -> PillColors(Color(0xFFFBF1DD), Color(0xFF8A6420))
     BookingStatus.CONFIRMED, BookingStatus.COMPLETED -> PillColors(Color(0xFFE2F2EE), Ok)
     BookingStatus.DECLINED -> PillColors(Color(0xFFF8E3E8), Danger)
+    BookingStatus.CANCELLED -> PillColors(Color(0xFFEFEDF2), Color(0xFF6F5E82))
 }
 
 @Composable

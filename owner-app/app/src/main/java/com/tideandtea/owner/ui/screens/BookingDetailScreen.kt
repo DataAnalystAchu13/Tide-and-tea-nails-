@@ -324,5 +324,13 @@ private fun Actions(b: Booking, vm: OwnerViewModel) {
         }
         BookingStatus.COMPLETED -> Section { Text("Done. Hope they loved their nails!", style = MaterialTheme.typography.bodyMedium) }
         BookingStatus.DECLINED -> Section { Text("Declined. ${b.ownerNote}", style = MaterialTheme.typography.bodyMedium) }
+        BookingStatus.CANCELLED -> Section("Cancelled by client") {
+            if (b.refundDue) {
+                Text("They cancelled more than 24 hours ahead, so refund the ${money(b.price.advance)} advance from your UPI app (ref ${b.paymentRef}).", style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = { vm.act("Refund marked as sent") { markRefunded(b) } }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("I've sent the refund") }
+            } else {
+                Text(if (b.paymentRef.isNotBlank()) "Cancelled under 24 hours before the slot, so the advance is kept. The slot is free again." else "They hadn't paid. The slot is free again.", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 }

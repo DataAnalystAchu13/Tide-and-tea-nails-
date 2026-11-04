@@ -14,7 +14,8 @@ enum class BookingStatus(val key: String, val label: String) {
     PAYMENT_SUBMITTED("payment_submitted", "Paid · confirm"),
     CONFIRMED("confirmed", "Confirmed"),
     COMPLETED("completed", "Done"),
-    DECLINED("declined", "Declined");
+    DECLINED("declined", "Declined"),
+    CANCELLED("cancelled", "Cancelled by client");
 
     companion object {
         fun from(key: String?): BookingStatus = entries.firstOrNull { it.key == key } ?: REQUESTED
@@ -62,6 +63,8 @@ data class Booking(
     val ownerNote: String,
     val paymentRef: String,
     val createdAtMillis: Long,
+    /** Client cancelled 24+ hours ahead after paying: the owner still has to send the advance back. */
+    val refundDue: Boolean = false,
 ) {
     val prettyDate: String
         get() = runCatching {
@@ -114,6 +117,7 @@ data class Booking(
                 ownerNote = r.str("owner_note"),
                 paymentRef = r.str("payment_ref"),
                 createdAtMillis = r.millis("created_at"),
+                refundDue = r.str("refund_due") == "true",
             )
         }
 
