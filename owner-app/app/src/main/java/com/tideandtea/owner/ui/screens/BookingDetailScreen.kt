@@ -291,13 +291,21 @@ private fun Actions(b: Booking, vm: OwnerViewModel) {
             ) { Text("Cancel booking") }
         }
         BookingStatus.PAYMENT_SUBMITTED -> Section("Check payment") {
+            var total by rememberSaveable(b.id + "pay") { mutableStateOf(b.price.total.toString()) }
+            var note by rememberSaveable(b.id + "paynote") { mutableStateOf("") }
+            val t = total.toIntOrNull() ?: 0
             Text("The client says they paid ${money(b.price.advance)}.", style = MaterialTheme.typography.bodyMedium)
             InfoRow("UPI reference", b.paymentRef, strong = true)
             Text("Their slot is held. Find this reference in your UPI app, look at the inspo, then confirm. If you can't do this set, decline it and refund the advance from your UPI app.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(total, { total = it.filter(Char::isDigit) }, label = { Text("Final total ₹") }, singleLine = true,
+                supportingText = { Text("Add travel or \"price varies\" add-ons here. Balance on the day: ${money((t - b.price.advance).coerceAtLeast(0))}") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(note, { note = it }, label = { Text("Note to client (optional)") }, placeholder = { Text("e.g. Travel to Velachery is ₹200, added to the balance") },
+                modifier = Modifier.fillMaxWidth(), minLines = 2)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = { vm.act("Client asked to re-check payment") { paymentNotFound(b) } }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("Not received") }
                 Button(
-                    onClick = { vm.act("Booking confirmed") { confirmPayment(b) } }, enabled = !vm.busy, modifier = Modifier.weight(1.4f),
+                    onClick = { vm.act("Booking confirmed") { confirmPayment(b, t, note.trim()) } }, enabled = !vm.busy && t >= b.price.advance, modifier = Modifier.weight(1.4f),
                     colors = ButtonDefaults.buttonColors(containerColor = Pink, contentColor = Plum),
                 ) { Text("Confirm booking") }
             }
