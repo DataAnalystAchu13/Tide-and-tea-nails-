@@ -1092,3 +1092,20 @@ h2 { color: var(--ink); }
   animation: spl-glint var(--load) linear var(--logo) both; }
 @keyframes spl-glint { 0% { left: 2px; opacity: 1; } 100% { left: calc(100% - 2px); opacity: 1; } }
 .spl-thanks .spl-text { max-width: 30ch; }
+
+/* Home hero on phones: one centred column, smaller art, buttons side by side */
+@media (max-width: 600px) {
+  .hero-grid { padding-top: 12px; gap: 18px; text-align: center; }
+  .hero-art { width: min(168px, 46vw); }
+  .bunny-hero { width: 58px; height: 64px; left: -16px; bottom: -8px; }
+  .hero .sp1 { width: 18px; height: 18px; }
+  .hero .eyebrow { font-size: .66rem; letter-spacing: .14em; line-height: 1.7; margin-bottom: 10px; text-wrap: balance; }
+  .hero h1 { font-size: clamp(2.1rem, 9.6vw, 2.6rem); line-height: 1.02; }
+  .hero h1 em { display: block; margin-top: 4px; }
+  .hero .lede, .hero-note { text-wrap: pretty; }
+  .hero .lede { font-size: .98rem; line-height: 1.5; margin: 14px auto 20px; max-width: 30em; }
+  .hero-cta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hero-cta .btn { min-height: 50px; padding: 0 10px; font-size: .7rem; letter-spacing: .1em; }
+  .hero-note { font-size: .82rem; line-height: 1.5; margin-top: 14px; }
+  .hero-inner { padding-bottom: 56px; }
+}
