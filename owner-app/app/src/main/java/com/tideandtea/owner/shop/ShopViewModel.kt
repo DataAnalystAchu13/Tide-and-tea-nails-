@@ -172,7 +172,7 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { repo.publish() }
             .onSuccess { msg ->
                 message = msg
-                if (msg.startsWith("Publishing")) { setUnpublished(false); lastPublished = System.currentTimeMillis() }
+                if (msg.startsWith("Publishing")) { storeUnpublished(false); lastPublished = System.currentTimeMillis() }
             }
             .onFailure { fail("Couldn't publish", it) }
         busy = false
@@ -193,8 +193,8 @@ class ShopViewModel(app: Application) : AndroidViewModel(app) {
 
     /* ---------------- helpers ---------------- */
 
-    private fun markUnpublished() = setUnpublished(true)
-    private fun setUnpublished(v: Boolean) { unpublished = v; prefs.edit().putBoolean("unpublished", v).apply() }
+    private fun markUnpublished() = storeUnpublished(true)
+    private fun storeUnpublished(v: Boolean) { unpublished = v; prefs.edit().putBoolean("unpublished", v).apply() }
 
     private fun act(success: String, done: () -> Unit = {}, block: suspend () -> Unit) = viewModelScope.launch {
         if (busy) return@launch
