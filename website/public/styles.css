@@ -833,3 +833,13 @@ h3 { letter-spacing: .01em; }
   .head-actions { gap: 4px; flex: none; }
   .head-actions .btn { padding: 0 14px; }
 }
+
+/* Shop: "Custom press-on designs" card, first in the grid */
+.pcard-custom .pimg { position: relative; display: grid; place-items: center; background: linear-gradient(150deg, #f4eefb 0%, #e9ddf7 55%, #f6efe6 100%); }
+.pcard-custom .bunny { width: 38%; height: auto; aspect-ratio: 90 / 98; }
+.pcard-custom .sp { position: absolute; width: 18px; height: 18px; fill: var(--gold); }
+.pcard-custom .sp1 { top: 18%; right: 18%; }
+.pcard-custom .sp2 { bottom: 26%; left: 16%; width: 12px; height: 12px; }
+.pcard-custom-cta { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); white-space: nowrap; padding: 8px 16px; border-radius: 999px;
+  background: var(--royal); color: #fff; font: 800 .74rem var(--body); letter-spacing: .12em; text-transform: uppercase; }
+.pcard-custom:hover .pcard-custom-cta { background: var(--royal-2); }

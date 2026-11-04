@@ -246,6 +246,21 @@ function pageHead(eyebrow, title, text = "", extra = "") {
 </div></section>`;
 }
 
+/** First card in the shop: opens the booking page with "Custom press-on designs" already picked. */
+function customPressonCard(c) {
+  const t = c.config.extensionTypes.find((x) => x.id === "pressons");
+  if (!t) return "";
+  return `<a class="pcard pcard-custom" href="/book/?set=${encodeURIComponent(t.id)}#book">
+  <div class="pimg"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg>
+    <svg class="sp sp1" aria-hidden="true"><use href="#sparkle"/></svg><svg class="sp sp2" aria-hidden="true"><use href="#sparkle"/></svg>
+    <span class="badge sale">Made for you</span>
+    <span class="pcard-custom-cta">Design yours</span>
+  </div>
+  <h3>${esc(t.name)}</h3>
+  <p class="pprice"><b>From ${money(t.price)}</b> <small class="muted">Book your set</small></p>
+</a>`;
+}
+
 function productCard(c, p, now) {
   const { price, unit, percentOff } = displayPrice(p, c.site, now);
   const sold = !p.madeToOrder && !(Number(p.stock) > 0);
@@ -445,7 +460,7 @@ export function shop(c, now) {
     ${shapes.length > 1 ? `<div class="chips" role="radiogroup" aria-label="Shape">${chip("shape", "")}${shapes.map((s) => chip("shape", s)).join("")}</div>` : ""}
     ${lengths.length > 1 ? `<div class="chips" role="radiogroup" aria-label="Length">${chip("length", "")}${lengths.map((s) => chip("length", s)).join("")}</div>` : ""}
   </div>
-  <div class="pgrid" id="pgrid">${c.products.map((p) => productCard(c, p, now)).join("")}</div>
+  <div class="pgrid" id="pgrid">${customPressonCard(c)}${c.products.map((p) => productCard(c, p, now)).join("")}</div>
   <p class="muted center" id="noMatch" hidden>No sets match those filters.</p>` : `<div class="empty card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><h2>New sets dropping soon</h2><p>Follow us on Instagram to hear first.</p></div>`}
 </div></section>
 ${sizingSection(c)}`;
