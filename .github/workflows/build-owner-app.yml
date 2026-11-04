@@ -1,7 +1,9 @@
 name: Build owner app
 
 # Builds the Android owner app (owner-app/) into an APK you can install on the owner's phone.
-# Download it from this workflow run's page, under "Artifacts" > tide-and-tea-owner-apk.
+# Builds from main are published as the release "Owner app (latest)":
+#   https://github.com/DataAnalystAchu13/Tide-and-tea-nails-/releases/tag/owner-app-latest
+# Every run also keeps the APK under "Artifacts" on its run page.
 #
 # Runs when:
 #   - owner app code changes land on main
@@ -15,6 +17,9 @@ on:
     branches: [main]
     paths: ["owner-app/**", ".github/workflows/build-owner-app.yml"]
   workflow_dispatch:
+
+permissions:
+  contents: write   # to update the "Owner app (latest)" release with the new APK
 
 concurrency:
   group: build-owner-app
@@ -74,3 +79,17 @@ jobs:
           path: owner-app/out/*.apk
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publish as the latest owner app release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp out/*.apk out/tide-and-tea-owner.apk
+          notes="Install on the owner's Android phone: open this page on the phone, tap tide-and-tea-owner.apk, then Install (allow installs from your browser if asked). Built from ${GITHUB_SHA::7}."
+          if gh release view owner-app-latest >/dev/null 2>&1; then
+            gh release upload owner-app-latest out/tide-and-tea-owner.apk --clobber
+            gh release edit owner-app-latest --notes "$notes" --target "$GITHUB_SHA"
+          else
+            gh release create owner-app-latest out/tide-and-tea-owner.apk --title "Owner app (latest)" --notes "$notes" --target "$GITHUB_SHA" --prerelease
+          fi
