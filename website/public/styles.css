@@ -903,3 +903,81 @@ h3 { letter-spacing: .01em; }
   .svc-grid .svc:nth-child(3n+2) { background: #fbf6ee; }
   .svc-grid .svc:nth-child(3n) { background: #f4f8ef; }
 }
+
+/* =====================================================================
+   Sky palette: periwinkle-to-lilac-pink sky, cloud-white surfaces,
+   soft charcoal ink and near-black buttons. Same layout as before.
+   ===================================================================== */
+:root {
+  --sky-1: #cad3eb;   /* periwinkle */
+  --sky-2: #d9d6ee;   /* haze */
+  --sky-3: #ebd3e7;   /* lilac pink */
+  --sky-4: #d1c1e2;   /* lavender */
+  --cloud: #faf8fc;
+  --sky: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 48%, var(--sky-3) 100%);
+  --clouds: radial-gradient(60% 50% at 8% 85%, rgba(255,255,255,.75), transparent 70%),
+            radial-gradient(45% 40% at 95% 20%, rgba(235,211,231,.9), transparent 70%),
+            radial-gradient(50% 45% at 85% 95%, rgba(255,255,255,.6), transparent 70%);
+  --royal: #26242e;    /* buttons and accents: soft near-black */
+  --royal-2: #3d3a49;
+  --plum: #1d1b24;
+  --ink: #2b2933;
+  --muted: #6a6676;
+  --mist: var(--cloud);
+  --lilac: #ece7f5;
+  --line: #e3ddee;
+  --pink: #ebd3e7;
+  --pink-deep: #8a76b0;  /* script accents: the lilac of the sweater */
+  --gold: #c9a35e;
+  --shadow: 0 1px 2px rgba(60, 50, 90, .05), 0 18px 40px -24px rgba(80, 70, 130, .35);
+}
+h2 { color: var(--ink); }
+
+/* Sky surfaces with dark ink */
+.hero, .pagehead, .is-hi { background: var(--clouds), var(--sky); background-color: var(--sky-2); color: var(--ink); }
+.hero h1, .pagehead h1 { color: var(--ink); }
+.hero h1 em, .pagehead h1 em { color: var(--pink-deep); }
+.lede { color: #4a4656; }
+.eyebrow { color: var(--pink-deep); }
+.hero .btn-ghost, .pagehead .btn-ghost { color: var(--ink); box-shadow: inset 0 0 0 2px rgba(38,36,46,.35); }
+.hero .btn-ghost:hover, .pagehead .btn-ghost:hover { box-shadow: inset 0 0 0 2px var(--ink); }
+.hero .btn-pink, .pagehead .btn-pink { background: rgba(255,255,255,.7); color: var(--ink); }
+.hero .btn-pink:hover, .pagehead .btn-pink:hover { background: #fff; }
+.logo-badge { box-shadow: 0 0 0 10px rgba(255,255,255,.35), 0 30px 60px -30px rgba(60,50,100,.6); }
+
+/* Frosted cloud header */
+.site-head { background: rgba(250,248,252,.82); -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+  color: var(--ink); box-shadow: 0 1px 0 var(--line); }
+.mainnav a:hover, .mainnav a[aria-current] { background: var(--lilac); }
+.cart-link { color: var(--ink); }
+.cart-link:hover { background: var(--lilac); }
+.menu summary span { background: var(--ink); }
+.site-head .cart-count { background: var(--royal); color: #fff; }
+
+.offer { background: var(--sky-3); color: var(--ink); }
+.offer svg { fill: var(--ink); }
+
+/* Footer: the sky again, upside down */
+.site-foot, .foot { background: var(--clouds), linear-gradient(180deg, var(--sky-3), var(--sky-1)); color: #4a4656; }
+.foot-name, .site-foot a { color: var(--ink); }
+.foot-tag, .foot .muted { color: var(--muted); }
+.foot-h { color: var(--pink-deep); }
+
+.igband { background: var(--clouds), var(--sky); color: var(--ink); }
+.igband h2 { color: var(--ink); }
+.igband h2 em { color: var(--pink-deep); }
+.sheet-head { background: var(--sky); color: var(--ink); }
+.sheet-head h3 { color: var(--ink); }
+.sheet-head .muted { color: var(--muted); }
+.icon-x { background: rgba(255,255,255,.6); color: var(--ink); }
+
+.btn-pink { background: var(--sky-3); color: var(--ink); }
+.btn-pink:hover { background: #e3c6de; }
+.btn-primary:disabled { background: #b4afc2; }
+.pay { background: #f4f1fa; border-color: var(--line); }
+.st-cancelled { background: #efedf2; }
+.hero-note { color: var(--muted); }
+.igband p { color: #4a4656; }
+/* Main call to action is near-black, like the reference */
+.hero .btn-pink, .pagehead .btn-pink { background: var(--royal); color: #fff; }
+.hero .btn-pink:hover, .pagehead .btn-pink:hover { background: var(--royal-2); }

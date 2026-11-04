@@ -196,7 +196,7 @@ export function layout(c, { path, title, description, body, jsonld = [], noindex
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
 ${noindex ? '<meta name="robots" content="noindex, follow">' : `<link rel="canonical" href="${esc(url)}">`}
-<meta name="theme-color" content="#3a1d5c">
+<meta name="theme-color" content="#cad3eb">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(c.site.brand.name)}">
 <meta property="og:title" content="${esc(fullTitle)}">
@@ -786,7 +786,7 @@ export function hi(c) {
 <meta property="og:description" content="${esc(c.site.brand.tagline)}">
 <meta property="og:image" content="${esc(absUrl(c, "/logo.png"))}">
 <meta property="og:url" content="${esc(absUrl(c, "/hi/"))}">
-<meta name="theme-color" content="#3a1d5c">
+<meta name="theme-color" content="#cad3eb">
 <link rel="icon" type="image/png" href="/favicon.png">
 <script>/* Seen the card before? Go straight on. */try{var t=new URLSearchParams(location.search).get("to")||"/";if(!/^\\/(?!\\/)/.test(t))t="/";window.__hiTo=t;if(localStorage.getItem("tt.hi.seen"))location.replace(t)}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
