@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, mergeConfig, quote, distanceKm } from "./defaults.js";
+import { DEFAULT_CONFIG, mergeConfig, quote, distanceKm, travelByDistance, addOnPrice, priceListHtml } from "./defaults.js";
 
 const SETTINGS = window.TIDE_SETTINGS || {};
 const SB_URL = String(SETTINGS.SUPABASE_URL || "").replace(/\/+$/, "");
@@ -308,9 +308,9 @@ function stepSet() {
     </div>
   </div>
   <div class="group">
-    <span class="label">Length</span>
+    <span class="label">Length ${cfg.lengths.every((l) => !l.price) ? `<span class="opt">(all lengths included)</span>` : ""}</span>
     <div class="chips">${cfg.lengths.map((l) => `
-      <label class="chip"><input type="radio" name="len" value="${esc(l.id)}" ${draft.length?.id === l.id ? "checked" : ""}><span>${esc(l.name)} <i>${l.price ? "+" + money(l.price) : "included"}</i></span></label>`).join("")}
+      <label class="chip"><input type="radio" name="len" value="${esc(l.id)}" ${draft.length?.id === l.id ? "checked" : ""}><span>${esc(l.name)}${l.price ? ` <i>+${money(l.price)}</i>` : ""}</span></label>`).join("")}
     </div>
   </div>
   <div class="group">
@@ -322,7 +322,7 @@ function stepSet() {
   <div class="group">
     <span class="label">Add-ons <span class="opt">(optional)</span></span>
     <div class="chips">${cfg.addOns.map((a) => `
-      <label class="chip"><input type="checkbox" name="addon" value="${esc(a.id)}" ${draft.addOns.some((x) => x.id === a.id) ? "checked" : ""}><span>${esc(a.name)} <i>+${money(a.price)}</i></span></label>`).join("")}
+      <label class="chip"><input type="checkbox" name="addon" value="${esc(a.id)}" ${draft.addOns.some((x) => x.id === a.id) ? "checked" : ""}><span>${esc(a.name)} <i>${addOnPrice(a).replace("Price varies", "price varies")}</i></span></label>`).join("")}
     </div>
   </div>`;
 }
@@ -372,7 +372,7 @@ function stepLocation() {
   const s = cfg.studio;
   return `
   <h3 class="step-title">Where are you?</h3>
-  <p class="step-sub">We come to you. Travel is charged by distance from our studio, and the map helps us find your door.</p>
+  <p class="step-sub">We come to you anywhere in ${esc(document.getElementById("book")?.dataset.area || "Chennai and Chengalpattu")}, or you can visit the studio.</p>
   <div class="mode-toggle group" role="radiogroup" aria-label="Visit type">
     <label class="choice"><input type="radio" name="mode" value="home" ${draft.mode === "home" ? "checked" : ""}>
       <span class="box"><b>Home visit</b><small>We bring the studio to you.</small></span></label>
@@ -383,15 +383,21 @@ function stepLocation() {
     <div class="group">
       <div class="loc-actions">
         <button type="button" class="btn btn-pink btn-sm" id="gpsBtn">Use my current location</button>
-        <span class="muted" id="gpsMsg"></span>
+        <span class="muted" id="gpsMsg" role="status" aria-live="polite"></span>
       </div>
-      ${MAPS_KEY ? `<div class="place-search" id="placeSearch"></div><div class="map" id="map" aria-label="Map. Tap to move the pin to your door."></div><span class="hint muted">Tap the map or drag the pin to your exact building.</span>` : ""}
+      <p class="hint muted loc-privacy">Your location is only used to find your address for this booking and to show it to the owner. It isn't used for anything else.</p>
+      <div class="place-search" id="placeSearch">${MAPS_KEY ? "" : `
+        <input type="search" id="osmSearch" autocomplete="off" enterkeyhint="search" placeholder="Or search your area, street or building" aria-label="Search your address">
+        <ul class="osm-results" id="osmResults" role="listbox" hidden></ul>`}</div>
+      <div class="map" id="map" aria-label="Map. Tap to move the pin to your door."></div>
+      <span class="hint muted">Tap the map or drag the pin to your exact building.</span>
     </div>
     <div class="field group">
       <label for="address">Full address</label>
       <textarea id="address" autocomplete="street-address" placeholder="House or flat number, street, area, landmark">${esc(draft.address)}</textarea>
     </div>
     <div id="locSummary"></div>
+    ${travelByDistance(cfg) ? "" : `<p class="note travel-note">${esc(cfg.travel.note)}</p>`}
   </div>
   <div id="studioLoc" ${draft.mode === "studio" ? "" : "hidden"}>
     <div class="note"><b>${esc(s.name)}</b><br>${esc(s.address)}<br>
@@ -403,67 +409,166 @@ function renderLocSummary() {
   const el = $("#locSummary"); if (!el) return;
   if (draft.lat == null) { el.innerHTML = ""; return; }
   const q = quote(cfg, draft);
-  el.innerHTML = `<div class="loc-summary"><span>About <b>${draft.distanceKm.toFixed(1)} km</b> from the studio</span>
-    <span>Travel charge <b>${q.travel ? money(q.travel) : "free"}</b></span>
+  const charge = travelByDistance(cfg) ? `<span>Travel charge <b>${q.travel ? money(q.travel) : "free"}</b></span>` : "";
+  el.innerHTML = `<div class="loc-summary"><span>Location saved · about <b>${draft.distanceKm.toFixed(1)} km</b> from the studio</span>
+    ${charge}
     <a href="https://www.google.com/maps/search/?api=1&query=${draft.lat},${draft.lng}" target="_blank" rel="noopener">Check pin on Google Maps</a></div>`;
 }
+
+/**
+ * The map. Google Maps when a key is set in config.js; otherwise OpenStreetMap through Leaflet,
+ * with OpenStreetMap's Nominatim for search and address lookup. Both need no extra setup.
+ * `pin` hides which one is in use: move(lat, lng, zoom) and resize().
+ */
+let pin = null, geocoder = null;
 
 function setPoint(lat, lng, address) {
   draft.lat = lat; draft.lng = lng;
   draft.distanceKm = distanceKm({ lat, lng }, cfg.studio);
   if (address && !draft.address.trim()) { draft.address = address; const a = $("#address"); if (a) a.value = address; }
   renderLocSummary(); updateTotal(); saveDraft();
-  if (map) { const p = { lat, lng }; marker.setPosition(p); map.panTo(p); }
+  if (pin) pin.move(lat, lng);
 }
 
-/* Google Maps (optional; only when a key is set) */
-let mapsReady = null, map = null, marker = null, geocoder = null;
-function loadMaps() {
-  if (!MAPS_KEY) return Promise.resolve(false);
-  if (mapsReady) return mapsReady;
-  mapsReady = new Promise((resolve) => {
-    window.__tideMapsReady = () => resolve(true);
+function loadScript(src, attrs = {}) {
+  return new Promise((resolve) => {
     const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&libraries=places,geocoding&loading=async&callback=__tideMapsReady`;
-    s.async = true; s.onerror = () => resolve(false);
+    s.src = src; s.async = true; Object.assign(s, attrs);
+    s.onload = () => resolve(true); s.onerror = () => resolve(false);
     document.head.appendChild(s);
   });
+}
+
+let mapsReady = null;
+function loadMaps() {
+  if (mapsReady) return mapsReady;
+  if (MAPS_KEY) {
+    mapsReady = new Promise((resolve) => {
+      window.__tideMapsReady = () => resolve("google");
+      loadScript(`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&libraries=places,geocoding&loading=async&callback=__tideMapsReady`)
+        .then((ok) => { if (!ok) resolve(""); });
+    });
+  } else {
+    const css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css";
+    css.crossOrigin = "anonymous";
+    document.head.appendChild(css);
+    mapsReady = loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js", { crossOrigin: "anonymous" })
+      .then((ok) => (ok && window.L ? "osm" : ""));
+  }
   return mapsReady;
 }
 
+const NOMINATIM = "https://nominatim.openstreetmap.org";
+async function nominatim(path, params) {
+  const u = new URL(NOMINATIM + path);
+  Object.entries({ format: "jsonv2", "accept-language": "en", ...params }).forEach(([k, v]) => u.searchParams.set(k, v));
+  const r = await fetch(u, { headers: { Accept: "application/json" } });
+  if (!r.ok) throw new Error(`Address lookup failed (${r.status})`);
+  return r.json();
+}
+
 async function reverseGeocode(lat, lng) {
-  if (!geocoder) return "";
   try {
-    const r = await geocoder.geocode({ location: { lat, lng } });
-    return r.results?.[0]?.formatted_address || "";
+    if (geocoder) {
+      const r = await geocoder.geocode({ location: { lat, lng } });
+      return r.results?.[0]?.formatted_address || "";
+    }
+    const r = await nominatim("/reverse", { lat, lon: lng, zoom: 18, addressdetails: 0 });
+    return r?.display_name || "";
   } catch { return ""; }
 }
 
 async function mountLocation() {
   renderLocSummary();
-  if (!(await loadMaps()) || !$("#map")) return;
-  const g = window.google.maps;
-  const start = draft.lat != null ? { lat: draft.lat, lng: draft.lng } : { lat: cfg.studio.lat, lng: cfg.studio.lng };
-  map = new g.Map($("#map"), { center: start, zoom: draft.lat != null ? 16 : 12, disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy", clickableIcons: false });
-  marker = new g.Marker({ position: start, map, draggable: true });
-  geocoder = new g.Geocoder();
+  pin = null;
+  const kind = await loadMaps();
+  const el = $("#map");
+  if (!el) return;
+  if (!kind) { el.hidden = true; return; } // offline or blocked: GPS and typing still work
+  const has = draft.lat != null;
+  const start = has ? { lat: draft.lat, lng: draft.lng } : { lat: cfg.studio.lat, lng: cfg.studio.lng };
   const pick = async (lat, lng) => {
+    draft.address = "";
+    setPoint(lat, lng, "");
     const addr = await reverseGeocode(lat, lng);
-    draft.address = ""; setPoint(lat, lng, addr);
+    if (addr && !draft.address.trim() && draft.lat === lat && draft.lng === lng) setPoint(lat, lng, addr);
   };
-  marker.addListener("dragend", (e) => pick(e.latLng.lat(), e.latLng.lng()));
-  map.addListener("click", (e) => pick(e.latLng.lat(), e.latLng.lng()));
+  if (kind === "google") mountGoogle(el, start, has, pick);
+  else mountOsm(el, start, has, pick);
+}
+
+function mountOsm(el, start, has, pick) {
+  const L = window.L;
+  const m = L.map(el, { zoomControl: true, attributionControl: true, tap: true }).setView([start.lat, start.lng], has ? 17 : 12);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+  }).addTo(m);
+  const icon = L.divIcon({ className: "map-pin", html: "<span></span>", iconSize: [30, 42], iconAnchor: [15, 42] });
+  const mk = L.marker([start.lat, start.lng], { draggable: true, icon, keyboard: true, title: "Your door" }).addTo(m);
+  mk.on("dragend", () => { const p = mk.getLatLng(); pick(p.lat, p.lng); });
+  m.on("click", (e) => { mk.setLatLng(e.latlng); pick(e.latlng.lat, e.latlng.lng); });
+  pin = {
+    move: (lat, lng, zoom) => { mk.setLatLng([lat, lng]); m.setView([lat, lng], zoom || Math.max(m.getZoom(), 16)); },
+    resize: () => m.invalidateSize(),
+  };
+  setTimeout(() => m.invalidateSize(), 50);
+  mountOsmSearch();
+}
+
+function mountOsmSearch() {
+  const input = $("#osmSearch"), list = $("#osmResults");
+  if (!input) return;
+  let timer = 0, seq = 0, results = [];
+  const close = () => { list.hidden = true; list.innerHTML = ""; };
+  const choose = (r) => {
+    close(); input.value = "";
+    draft.address = "";
+    setPoint(Number(r.lat), Number(r.lon), r.display_name);
+    if (pin) pin.move(Number(r.lat), Number(r.lon), 17);
+  };
+  const run = async () => {
+    const q = input.value.trim();
+    if (q.length < 3) { close(); return; }
+    const mine = ++seq;
+    try {
+      // Bias toward the studio's city but still find anywhere in India.
+      const d = 0.6, s = cfg.studio;
+      results = await nominatim("/search", { q, countrycodes: "in", limit: 6, viewbox: `${s.lng - d},${s.lat + d},${s.lng + d},${s.lat - d}` });
+    } catch { results = []; }
+    if (mine !== seq) return;
+    list.innerHTML = results.length
+      ? results.map((r, i) => `<li><button type="button" role="option" data-i="${i}">${esc(r.display_name)}</button></li>`).join("")
+      : `<li class="muted">No match. Try a nearby landmark or area name, or type your address below.</li>`;
+    list.hidden = false;
+  };
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 600); }); // Nominatim allows ~1 request/second
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(timer); run(); } if (e.key === "Escape") close(); });
+  list.addEventListener("click", (e) => { const b = e.target.closest("button[data-i]"); if (b) choose(results[Number(b.dataset.i)]); });
+}
+
+async function mountGoogle(el, start, has, pick) {
+  const g = window.google.maps;
+  const m = new g.Map(el, { center: start, zoom: has ? 16 : 12, disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy", clickableIcons: false });
+  const mk = new g.Marker({ position: start, map: m, draggable: true });
+  geocoder = new g.Geocoder();
+  pin = {
+    move: (lat, lng, zoom) => { const p = { lat, lng }; mk.setPosition(p); m.panTo(p); if (zoom) m.setZoom(zoom); },
+    resize: () => g.event.trigger(m, "resize"),
+  };
+  mk.addListener("dragend", (e) => pick(e.latLng.lat(), e.latLng.lng()));
+  m.addListener("click", (e) => pick(e.latLng.lat(), e.latLng.lng()));
   try {
     const { PlaceAutocompleteElement } = await g.importLibrary("places");
     const ac = new PlaceAutocompleteElement({ includedRegionCodes: ["in"] });
-    ac.setAttribute("placeholder", "Search your building or area");
+    ac.setAttribute("placeholder", "Or search your building or area");
     $("#placeSearch").appendChild(ac);
     const onPick = async (place) => {
       await place.fetchFields({ fields: ["location", "formattedAddress", "displayName"] });
       if (!place.location) return;
       draft.address = "";
       setPoint(place.location.lat(), place.location.lng(), place.formattedAddress || place.displayName || "");
-      map.setZoom(17);
+      pin.move(place.location.lat(), place.location.lng(), 17);
     };
     ac.addEventListener("gmp-select", (e) => onPick(e.placePrediction.toPlace()));
     ac.addEventListener("gmp-placeselect", (e) => onPick(e.place)); // older API versions
@@ -471,18 +576,33 @@ async function mountLocation() {
 }
 
 function useGps() {
-  const msg = $("#gpsMsg");
-  if (!navigator.geolocation) { msg.textContent = "Location isn't available in this browser. Type your address below."; return; }
+  const msg = $("#gpsMsg"), btn = $("#gpsBtn");
+  if (!navigator.geolocation) { msg.textContent = "Location isn't available in this browser. Search or type your address below."; return; }
+  if (!window.isSecureContext) { msg.textContent = "Location only works on the https:// address. Search or type your address below."; return; }
   msg.textContent = "Finding you…";
-  navigator.geolocation.getCurrentPosition(async (p) => {
+  if (btn) btn.disabled = true;
+  const done = () => { if (btn) btn.disabled = false; };
+  const ok = async (p) => {
+    done();
     const { latitude: lat, longitude: lng, accuracy } = p.coords;
-    msg.textContent = accuracy > 150 ? "Found you roughly. Move the pin to your door if needed." : "Found you.";
-    draft.address = draft.address || "";
+    msg.textContent = accuracy > 150 ? "Found you roughly. Drag the pin to your door." : "Found you. Check the pin is on your building.";
+    setPoint(lat, lng, "");
+    if (pin) pin.move(lat, lng, 17);
     const addr = await reverseGeocode(lat, lng);
-    setPoint(lat, lng, addr);
-  }, (err) => {
-    msg.textContent = err.code === 1 ? "Location permission was blocked. Search or type your address instead." : "Couldn't get your location. Type your address below.";
-  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+    if (addr && draft.lat === lat) setPoint(lat, lng, addr);
+  };
+  const fail = (err, retried) => {
+    // High accuracy can time out indoors; one quick retry with the network position usually works.
+    if (err.code !== 1 && !retried) {
+      navigator.geolocation.getCurrentPosition(ok, (e) => fail(e, true), { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+      return;
+    }
+    done();
+    msg.textContent = err.code === 1
+      ? "Location is blocked for this site. Allow it in your browser settings, or search for your address instead."
+      : "Couldn't get your location. Search for your area or tap the map instead.";
+  };
+  navigator.geolocation.getCurrentPosition(ok, (e) => fail(e, false), { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
 }
 
 function stepPhotos() {
@@ -535,8 +655,8 @@ function stepYou() {
   <div class="summary" aria-label="Price estimate">
     ${row(esc(draft.extension?.name || ""), money(q.base))}
     ${draft.length ? row(`${esc(draft.length.name)} length`, q.length ? money(q.length) : "included") : ""}
-    ${draft.addOns.map((a) => row(esc(a.name), money(a.price))).join("")}
-    ${row(draft.mode === "home" ? "Travel" : "Studio visit", q.travel ? money(q.travel) : "free")}
+    ${draft.addOns.map((a) => row(esc(a.name), Number(a.price) > 0 ? money(a.price) : "price on approval")).join("")}
+    ${row(draft.mode === "home" ? "Travel" : "Studio visit", draft.mode !== "home" ? "free" : travelByDistance(cfg) ? (q.travel ? money(q.travel) : "free") : "confirmed by owner")}
     <div class="sumrow total"><span>Estimated total</span><span>${money(q.total)}</span></div>
     <div class="sumrow adv"><span>Advance after approval (${cfg.advancePercent}%)</span><span>${money(q.advance)}</span></div>
     <div class="sumrow"><span>${esc(prettyDate(draft.date))} · ${esc(draft.slot)}</span><span>${draft.inspo.length} inspo · ${draft.natural.length} nail pics</span></div>
@@ -564,7 +684,7 @@ function validate() {
     if (!draft.slot) return "Choose a time.";
   }
   if (step === 2 && draft.mode === "home") {
-    if (draft.lat == null) return "Tap “Use my current location”" + (MAPS_KEY ? " or search for your address on the map." : " so we can work out the travel charge.");
+    if (draft.lat == null) return "Tap “Use my current location”, search your area, or tap the map so we can find you.";
     if (draft.address.length < 8) return "Add your full address so we can find your door.";
   }
   if (step === 3 && draft.inspo.length === 0) return "Add at least one inspo picture.";
@@ -576,7 +696,11 @@ function validate() {
   return "";
 }
 
-function showError(m) { const e = $("#formError"); e.textContent = m; e.hidden = false; }
+function showError(m) {
+  const e = $("#formError"); e.textContent = m; e.hidden = false;
+  e.scrollIntoView({ behavior: "smooth", block: "center" });
+  toast(m); // the message can sit below the sticky footer on phones; a toast is always seen
+}
 function hideError() { $("#formError").hidden = true; }
 
 async function next(e) {
@@ -814,17 +938,7 @@ async function sendChat(e) {
 /* ------------------------------------------------------------------ */
 
 function renderPrices() {
-  const li = (name, amt, sub = "") => `<li><span>${esc(name)}</span><span class="amt">${amt}</span>${sub ? `<small>${esc(sub)}</small>` : ""}</li>`;
-  const slabs = [...cfg.travel.slabs].sort((a, b) => a.upToKm - b.upToKm);
-  let prev = 0;
-  const travel = slabs.map((s) => { const r = li(`${prev}–${s.upToKm} km`, s.charge ? money(s.charge) : "Free"); prev = s.upToKm; return r; }).join("")
-    + li(`Beyond ${prev} km`, `+${money(cfg.travel.perKmBeyond)}/km`);
-  $("#priceList").innerHTML = `
-    <div class="card price-card"><h3>Extensions</h3><ul class="plist">${cfg.extensionTypes.map((t) => li(t.name, money(t.price), t.description)).join("")}</ul></div>
-    <div class="card price-card"><h3>Length</h3><ul class="plist">${cfg.lengths.map((l) => li(l.name, l.price ? "+" + money(l.price) : "Included")).join("")}</ul>
-      <h3 style="margin-top:18px">Add-ons</h3><ul class="plist">${cfg.addOns.map((a) => li(a.name, "+" + money(a.price))).join("")}</ul></div>
-    <div class="card price-card"><h3>Home visit travel</h3><ul class="plist">${travel}</ul>
-      <p class="muted" style="margin:12px 0 0">Advance of ${cfg.advancePercent}% after approval confirms your slot. The balance is paid on the day.</p></div>`;
+  $("#priceList").outerHTML = `<div id="priceList">${priceListHtml(cfg)}</div>`;
   const fs = $("#footStudio"); if (fs) fs.textContent = cfg.studio.address;
 }
 
@@ -860,7 +974,7 @@ function bind() {
     if (t.name === "addon") draft.addOns = [...form.querySelectorAll('input[name="addon"]:checked')].map((i) => cfg.addOns.find((a) => a.id === i.value)).filter(Boolean);
     if (t.name === "date") { draft.date = t.value; draft.slot = ""; watchTaken(); const el = $("#slotChips"); if (el) el.innerHTML = slotChips(); }
     if (t.name === "slot") draft.slot = t.value;
-    if (t.name === "mode") { draft.mode = t.value; $("#homeLoc").hidden = draft.mode !== "home"; $("#studioLoc").hidden = draft.mode !== "studio"; }
+    if (t.name === "mode") { draft.mode = t.value; $("#homeLoc").hidden = draft.mode !== "home"; $("#studioLoc").hidden = draft.mode !== "studio"; if (pin) setTimeout(pin.resize, 30); }
     if (t.type === "file") { addFiles(t.dataset.kind, t.files); t.value = ""; }
     hideError(); updateTotal(); saveDraft();
   });
@@ -926,7 +1040,7 @@ async function boot() {
   });
   backend.watchMine(renderMine);
   if (step === 1) watchTaken();
-  if (MAPS_KEY) loadMaps(); // warm up in the background so the map step opens instantly
+  loadMaps(); // warm up in the background so the map step opens instantly
 }
 
 boot();

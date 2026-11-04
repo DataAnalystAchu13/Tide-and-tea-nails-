@@ -64,6 +64,7 @@ val SITE_PAGES = listOf(
             F.Text("contact.address", "Street address"),
             F.Text("contact.area", "Area", hint = "Anna Nagar"),
             F.Text("contact.city", "City"),
+            F.Text("contact.serviceArea", "Home visit area", hint = "Chennai and Chengalpattu"),
             F.Text("contact.pincode", "PIN code"),
         )),
         FormSection("Opening hours", listOf(
@@ -105,6 +106,14 @@ val SITE_PAGES = listOf(
     )),
     EditPage("sizing", "Sizing guide", "Press-on size chart", Icons.Outlined.Straighten, false, listOf(
         FormSection("Sizing guide", listOf(F.Text("sizing", "Guide", lines = 10), F.Note(MD))),
+        FormSection("Guide pictures", listOf(
+            F.Images("sizingImages", "Sizing chart and how-to-apply pictures", max = 4),
+            F.Note("Shown on the shop page above the written guide, with an Order press-ons button."),
+        )),
+        FormSection("Press-on kit", listOf(
+            F.Text("kit.title", "Heading", hint = "In every press-on order"),
+            F.Words("kit.items", "What's included", "Glue tabs, Liquid nail glue, Cuticle pusher, Nail buffer, Alcohol wipes"),
+        )),
     )),
     EditPage("policies", "Policies", "Shipping, returns, privacy, terms", Icons.Outlined.Gavel, false, listOf(
         FormSection("Policies", listOf(
@@ -131,11 +140,11 @@ val PRICE_PAGES = listOf(
             F.Rows("extensionTypes", "Extensions", listOf(Col("name", "Name"), Col("price", "Price", num = true, prefix = "₹ "), Col("description", "Short description", lines = 2)), add = "Add an extension", idFromName = true),
         )),
         FormSection("Lengths", listOf(
-            F.Rows("lengths", "Lengths", listOf(Col("name", "Name"), Col("price", "Extra charge", num = true, prefix = "₹ ")), add = "Add a length", idFromName = true),
+            F.Rows("lengths", "Lengths", listOf(Col("name", "Name"), Col("price", "Extra charge (0 = included)", num = true, prefix = "₹ ")), add = "Add a length", idFromName = true),
         )),
         FormSection("Shapes", listOf(F.Words("shapes", "Shapes", "Almond, Coffin, Square, Oval, Stiletto"))),
         FormSection("Add-ons", listOf(
-            F.Rows("addOns", "Add-ons", listOf(Col("name", "Name"), Col("price", "Price", num = true, prefix = "₹ ")), add = "Add an add-on", idFromName = true),
+            F.Rows("addOns", "Add-ons", listOf(Col("name", "Name"), Col("price", "Price (0 = price varies)", num = true, prefix = "₹ ")), add = "Add an add-on", idFromName = true),
         )),
         FormSection("Payment", listOf(
             F.Num("advancePercent", "Advance to confirm a booking", hint = "30", prefix = "% "),
@@ -145,6 +154,7 @@ val PRICE_PAGES = listOf(
         )),
         FormSection("Home visits", listOf(
             F.Text("travel.note", "Travel note", lines = 2),
+            F.Note("Leave the distances below empty to show the travel note instead of a price; you then add the travel charge when you approve."),
             F.Rows("travel.slabs", "Travel charge by distance", listOf(Col("upToKm", "Up to (km)", num = true), Col("charge", "Charge", num = true, prefix = "₹ ")), add = "Add a distance"),
             F.Num("travel.perKmBeyond", "Per km after the last distance", prefix = "₹ "),
             F.Text("studio.name", "Starting point name"),
