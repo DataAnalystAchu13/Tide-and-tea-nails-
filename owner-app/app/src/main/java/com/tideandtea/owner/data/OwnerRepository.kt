@@ -119,8 +119,21 @@ class OwnerRepository(private val supabase: SupabaseClient = Supa.client) {
     }
 
     /** Confirms the advance. The database records it in payment history. */
-    suspend fun confirmPayment(b: Booking) {
-        update(b, buildJsonObject { put("status", BookingStatus.CONFIRMED.key) })
+    suspend fun confirmPayment(b: Booking, total: Int = b.price.total, note: String = "") {
+        update(b, buildJsonObject {
+            put("status", BookingStatus.CONFIRMED.key)
+            // The client paid before the owner reviewed, so the final total (travel, "price varies"
+            // add-ons) is set here. The advance stays what they actually paid.
+            if (total != b.price.total) put("price", buildJsonObject {
+                put("base", b.price.base)
+                put("length", b.price.length)
+                put("addOns", b.price.addOns)
+                put("travel", b.price.travel)
+                put("total", total)
+                put("advance", b.price.advance)
+            })
+            if (note.isNotBlank()) put("owner_note", note)
+        })
     }
 
     suspend fun paymentNotFound(b: Booking) {

@@ -71,9 +71,9 @@ import com.tideandtea.owner.ui.theme.Royal
 private data class Filter(val label: String, val statuses: Set<BookingStatus>?)
 
 private val FILTERS = listOf(
-    Filter("New", setOf(BookingStatus.REQUESTED)),
-    Filter("Awaiting advance", setOf(BookingStatus.APPROVED)),
-    Filter("Check payment", setOf(BookingStatus.PAYMENT_SUBMITTED)),
+    // Clients pay the advance straight after booking, so paid requests come first.
+    Filter("Paid · confirm", setOf(BookingStatus.PAYMENT_SUBMITTED)),
+    Filter("Not paid yet", setOf(BookingStatus.REQUESTED, BookingStatus.APPROVED)),
     Filter("Upcoming", setOf(BookingStatus.CONFIRMED)),
     Filter("All", null),
 )

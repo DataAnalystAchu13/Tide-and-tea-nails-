@@ -9,9 +9,9 @@ import java.util.Locale
 
 /** Mirrors public.bookings in Supabase (see supabase/migrations). */
 enum class BookingStatus(val key: String, val label: String) {
-    REQUESTED("requested", "New request"),
+    REQUESTED("requested", "Not paid yet"),
     APPROVED("approved", "Awaiting advance"),
-    PAYMENT_SUBMITTED("payment_submitted", "Check payment"),
+    PAYMENT_SUBMITTED("payment_submitted", "Paid · confirm"),
     CONFIRMED("confirmed", "Confirmed"),
     COMPLETED("completed", "Done"),
     DECLINED("declined", "Declined");
