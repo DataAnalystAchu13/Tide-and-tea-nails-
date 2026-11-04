@@ -800,3 +800,36 @@ h3 { letter-spacing: .01em; }
   .brand { min-width: 0; font-size: .95rem; letter-spacing: .03em; }
   .brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* About me: polaroid photo and a handwritten-feel letter */
+.aboutme { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(32px, 6vw, 72px); align-items: start; }
+.polaroid { position: relative; margin: 8px auto 0; width: min(420px, 100%); padding: 14px 14px 18px; background: #fff; border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(58,29,92,.06), 0 30px 60px -30px rgba(58,29,92,.45); transform: rotate(-2.5deg); }
+.polaroid img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; object-position: center 30%; border-radius: 2px; }
+.polaroid figcaption { margin-top: 12px; text-align: center; font: 400 1.9rem/1 var(--script, cursive); color: var(--royal); }
+.polaroid .tape { position: absolute; top: -14px; left: 50%; width: 110px; height: 30px; transform: translateX(-50%) rotate(3deg);
+  background: rgba(236, 226, 246, .85); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.polaroid .bunny { position: absolute; left: -34px; bottom: 54px; width: 84px; height: 92px; transform: rotate(4deg); }
+.polaroid .sp1 { top: 10%; right: -22px; left: auto; }
+.polaroid .sp2 { bottom: -10px; right: 24%; }
+.letter { padding: clamp(24px, 4vw, 44px); }
+.letter .prose p { font-size: 1.08rem; line-height: 1.8; }
+.letter .prose p:first-child::first-letter { font: 500 3.4rem/.8 var(--display); float: left; margin: 6px 10px 0 0; color: var(--royal); }
+.signoff { margin: 22px 0 26px; color: var(--muted); font-weight: 700; }
+.signoff span { display: block; margin-top: 4px; font: 400 2.8rem/1 var(--script, cursive); color: var(--royal); }
+.about-pics.strip { grid-template-columns: repeat(4, 1fr); margin-top: 32px; }
+@media (max-width: 760px) {
+  .aboutme { grid-template-columns: 1fr; }
+  .polaroid { width: min(320px, 86%); }
+  .polaroid .bunny { left: -24px; width: 70px; height: 76px; }
+  .about-pics.strip { grid-template-columns: 1fr 1fr; }
+}
+.section:has(> .aboutme) { overflow-x: clip; }
+.letter .hero-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
+@media (max-width: 760px) {
+  .head-inner { gap: 8px; }
+  .brand { gap: 8px; font-size: .86rem; letter-spacing: .02em; flex: 1 1 auto; }
+  .brand img { width: 34px; height: 34px; }
+  .head-actions { gap: 4px; flex: none; }
+  .head-actions .btn { padding: 0 14px; }
+}

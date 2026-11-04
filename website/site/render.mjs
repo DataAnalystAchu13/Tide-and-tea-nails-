@@ -584,15 +584,29 @@ export function orders(c) {
 
 export function about(c) {
   const a = c.site.about;
-  const body = `${pageHead("About us", a.title)}
-<section class="section"><div class="wrap about">
-  <div class="prose">${md(a.body)}</div>
-  ${(a.images || []).length ? `<div class="about-pics">${a.images.slice(0, 4).map((u) => img(u, `${c.site.brand.name}`)).join("")}</div>` : `<div class="about-pics solo"><img class="logo-badge" src="/logo.webp" alt="${esc(c.site.brand.name)} logo" width="320" height="320" loading="lazy"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg></div>`}
-</div></section>
+  const photo = a.photo || "";
+  const extra = (a.images || []).filter(Boolean);
+  const body = `${pageHead("About me", a.title)}
+<section class="section"><div class="wrap aboutme">
+  <figure class="polaroid">
+    <span class="tape" aria-hidden="true"></span>
+    ${photo ? img(photo, `The founder of ${c.site.brand.name}`, "", true) : `<img class="logo-badge" src="/logo.webp" alt="${esc(c.site.brand.name)} logo" width="320" height="320">`}
+    ${a.caption ? `<figcaption>${esc(a.caption)}</figcaption>` : ""}
+    <svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg>
+    <svg class="sp sp1" aria-hidden="true"><use href="#sparkle"/></svg><svg class="sp sp2" aria-hidden="true"><use href="#sparkle"/></svg>
+  </figure>
+  <article class="letter card">
+    <div class="prose">${md(a.body)}</div>
+    ${a.signoff || a.signature ? `<p class="signoff">${esc(a.signoff || "")}<span>${esc(a.signature || "")}</span></p>` : ""}
+    <div class="hero-cta"><a class="btn btn-primary" href="/book/#book">Book your set with me</a><a class="btn btn-quiet" href="/shop/">Shop press-ons</a></div>
+  </article>
+</div>
+${extra.length ? `<div class="wrap"><div class="about-pics strip">${extra.slice(0, 4).map((u) => img(u, c.site.brand.name)).join("")}</div></div>` : ""}
+</section>
 ${followBand(c)}`;
   return {
     path: "/about/",
-    html: layout(c, { path: "/about/", title: "About us", description: plain(a.body, 155), body, jsonld: [salonLd(c), crumbs(c, [["Home", "/"], ["About", "/about/"]])] }),
+    html: layout(c, { path: "/about/", title: "About me", description: plain(a.body, 155), ogImage: photo ? (photo.startsWith("/") ? absUrl(c, photo) : photo) : "", body, jsonld: [salonLd(c), crumbs(c, [["Home", "/"], ["About", "/about/"]])] }),
   };
 }
 

@@ -111,12 +111,20 @@ val SITE_PAGES = listOf(
             F.Note("Auto uses the standard Tide & Tea colours. Publish to see changes on the site."),
         )),
     )),
-    EditPage("about", "About us", "Your story and studio photos", Icons.Outlined.Badge, false, listOf(
-        FormSection("About us", listOf(
-            F.Text("about.title", "Heading"),
-            F.Text("about.body", "Your story", lines = 8),
+    EditPage("about", "About me", "Your photo, your story and sign-off", Icons.Outlined.Badge, false, listOf(
+        FormSection("Your photo", listOf(
+            F.Image("about.photo", "Photo of you"),
+            F.Text("about.caption", "Handwritten caption under the photo", hint = "the girl behind the nails"),
+        )),
+        FormSection("Your story", listOf(
+            F.Text("about.title", "Heading", hint = "hii girlies, *I'm Akshaya!* 🎀🤎"),
+            F.Text("about.body", "Your story", lines = 10),
             F.Note(MD),
-            F.Images("about.images", "Photos", max = 6),
+            F.Text("about.signoff", "Sign-off", hint = "With love,"),
+            F.Text("about.signature", "Signature", hint = "Akshaya ♡"),
+        )),
+        FormSection("More photos (optional)", listOf(
+            F.Images("about.images", "Studio or work photos shown under your story", max = 4),
         )),
     )),
     EditPage("contact", "Contact and hours", "Phone, WhatsApp, address, Google", Icons.Outlined.Call, false, listOf(
