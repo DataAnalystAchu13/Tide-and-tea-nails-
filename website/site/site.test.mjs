@@ -59,6 +59,7 @@ test("blank texts fall back to defaults, hidden sections disappear", async () =>
   assert.deepEqual(fillBlanks(base, { a: " ", rows: [{ t: "" }], show: { steps: false } }), { a: "Default", rows: [{ t: "x" }], show: { steps: false } });
   const { pages } = await build({ quiet: true });
   const h = pages.find((p) => p.path === "/").html;
-  assert.ok(h.includes('class="steps-strip"'));
+  assert.ok(h.includes('class="splash"'), "opening screen with the booking steps");
+  assert.ok(h.includes('tt.splash'), "splash shows once per visit");
   assert.ok(h.includes("Pay advance"));
 });
