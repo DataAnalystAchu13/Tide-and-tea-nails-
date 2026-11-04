@@ -10,7 +10,6 @@ const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden=
 <symbol id="i-ig" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></symbol>
 <symbol id="i-wa" viewBox="0 0 24 24"><path d="M4 20l1.2-4A8 8 0 1 1 8 18.8L4 20z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 9c0 3 3 6 6 6l1-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2L9 9z" fill="currentColor"/></symbol>
 <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3 6.6 7 .7-5.3 4.8 1.6 7L12 17.5 5.7 21l1.6-7L2 9.3l7-.7z"/></symbol>
-<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </defs></svg>`;
 
 const NAV = [
@@ -184,7 +183,7 @@ export function layout(c, { path, title, description, body, jsonld = [], noindex
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
 ${noindex ? '<meta name="robots" content="noindex, follow">' : `<link rel="canonical" href="${esc(url)}">`}
-<meta name="theme-color" content="#faf7f4">
+<meta name="theme-color" content="#3a1d5c">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(c.site.brand.name)}">
 <meta property="og:title" content="${esc(fullTitle)}">
@@ -202,7 +201,7 @@ ${noindex ? '<meta name="robots" content="noindex, follow">' : `<link rel="canon
 <meta name="apple-mobile-web-app-title" content="Tide &amp; Tea">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Allura&family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Allura&family=Nunito:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="/styles.css">
 ${head}
 ${jsonld.map(ld).join("\n")}
@@ -217,7 +216,6 @@ ${header(c, path)}
 ${body}
 </main>
 ${footer(c)}
-${/^\/(book|cart|orders|hi)\//.test(path) ? "" : `<a class="mcta" href="/book/#book"><span>Book a home visit</span><svg aria-hidden="true"><use href="#i-arrow"/></svg></a>`}
 <div id="toast" class="toast" role="status" hidden></div>
 <script src="/config.js"></script>
 <script type="module" src="/site.js"></script>
@@ -305,7 +303,7 @@ function faqBlock(c) {
   const f = (c.site.faq || []).filter((x) => x && x.q && x.a);
   if (!f.length) return "";
   return `<section class="section"><div class="wrap">
-  <p class="kicker">FAQ</p><h2>Questions, <em>answered</em></h2>
+  <h2>Questions, <em>answered</em></h2>
   <div class="faq">${f.map((x) => `<details><summary>${esc(x.q)}</summary><div>${md(x.a)}</div></details>`).join("")}</div>
 </div></section>`;
 }
@@ -319,7 +317,7 @@ function followBand(c) {
   if (!L.ig) return "";
   return `<section class="section"><div class="wrap"><div class="igband">
   <svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg>
-  <div><h2>Stay <em>connected</em></h2><p>Follow <b>@${esc(L.ig)}</b> for new designs, offers and press-on drops.</p></div>
+  <div><h2>Fresh sets <em>every week</em></h2><p>Follow <b>@${esc(L.ig)}</b> for new designs, offers and press-on drops.</p></div>
   <a class="btn btn-pink" href="${esc(L.igUrl)}" rel="noopener" target="_blank"><svg class="ico" aria-hidden="true"><use href="#i-ig"/></svg>Follow on Instagram</a>
 </div></div></section>`;
 }
@@ -338,82 +336,56 @@ export function home(c, now) {
   const homeSets = c.config.extensionTypes.filter((t) => t.id !== "pressons" && Number(t.price) > 0);
   const from = Math.min(...(homeSets.length ? homeSets : c.config.extensionTypes).map((t) => t.price));
   const k = c.site.contact;
-  const a = c.site.about || {};
-  const money0 = (t) => (Number(t.price) > 0 ? money(t.price) : "Ask us");
-  const menuSets = c.config.extensionTypes.filter((t) => t.id !== "pressons");
-  const addOns = (c.config.addOns || []).slice(0, 6);
-  // Photo tiles: real work photos when the owner adds them, otherwise press-on shots.
-  const gallery = [...(a.images || []), ...c.products.flatMap((p) => (p.images || []).slice(0, 1))].filter(Boolean).slice(0, 3);
-  const detailPic = (a.images || [])[0] || "";
   const body = `
-<section class="stage${h.heroImage ? " has-photo" : ""}">
-  <div class="stage-card">
-    ${h.heroImage ? img(h.heroImage, "", "stage-photo", true) : `<div class="stage-marble" aria-hidden="true"></div>`}
-    <div class="stage-copy">
-      <p class="script">welcome to</p>
-      <h1>${rich(h.title)}</h1>
-      <p class="lede">${esc(h.text)}</p>
-      <div class="hero-cta">
-        <a class="btn btn-pink" href="/book/#book">Book a home visit</a>
-        <a class="btn btn-glass" href="/shop/">Shop press-ons</a>
+<section class="hero home-hero">
+  <div class="hero-inner">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">${esc(h.eyebrow)}</p>
+        <h1>${rich(h.title)}</h1>
+        <p class="lede">${esc(h.text)}</p>
+        <div class="hero-cta">
+          <a class="btn btn-pink" href="/book/#book">Book a home visit</a>
+          <a class="btn btn-ghost" href="/shop/">Shop press-ons</a>
+        </div>
+        <p class="hero-note">Sets from ${money(from)} · home visits across ${esc(serviceArea(c))} · open ${esc((k.hours || [])[0]?.days || "every day")}</p>
+      </div>
+      <div class="hero-art${h.heroImage ? " has-photo" : ""}" aria-hidden="true">
+        ${h.heroImage ? img(h.heroImage, "", "hero-photo", true) : `<img class="logo-badge" src="/logo.webp" alt="" width="320" height="320" fetchpriority="high">`}
+        <svg class="bunny bunny-hero"><use href="#bunny"/></svg>
+        <svg class="sp sp1"><use href="#sparkle"/></svg><svg class="sp sp2"><use href="#sparkle"/></svg><svg class="sp sp3"><use href="#sparkle"/></svg>
       </div>
     </div>
-    <div class="chip-float cf1"><span class="dot"></span>Tomorrow's slots open</div>
   </div>
-  <ul class="trust wrap">
-    <li><b>${money(from)}</b><span>sets from</span></li>
-    <li><b>At home</b><span>across ${esc(serviceArea(c))}</span></li>
-    <li><b>${esc((k.hours || [])[0]?.days || "Every day")}</b><span>${esc((k.hours || [])[0]?.time || "open")}</span></li>
-  </ul>
 </section>
 
-<section class="section intro"><div class="wrap center">
-  <p class="kicker">${esc(h.eyebrow)}</p>
-  <h2>A little <em>luxury,</em> at your doorstep</h2>
-  <p class="lede">Your inspo, your living room, salon-quality sets. We bring sterilised tools and the full kit so you can sit back with a cup of tea.</p>
-  ${gallery.length >= 3 ? `<div class="arches">${gallery.map((u, i) => `<figure class="arch a${i + 1}">${img(u, "")}</figure>`).join("")}</div>` : ""}
-  <a class="btn btn-primary" href="/book/#book">Book now</a>
-</div></section>
+<section class="steps-strip" aria-label="How booking works">
+  <ol class="how">
+    <li><b>Request</b><span>Pick your set, slot and location, add inspo pics.</span></li>
+    <li><b>Pay advance</b><span>Scan the UPI QR. Your slot is held right away.</span></li>
+    <li><b>We confirm</b><span>We check your inspo and confirm on WhatsApp.</span></li>
+    <li><b>Nail day</b><span>We arrive with everything. You relax.</span></li>
+  </ol>
+</section>
 
-<section class="section menu-sec"><div class="wrap">
-  <div class="center"><p class="kicker">Pick your look</p><h2>The <em>menu</em></h2>
-  <p class="lede">Considered nail care, thoughtful details and finishes made to last. Every length is included.</p></div>
-  <div class="menu-cols">
-    <div><h3>Extensions</h3><ul class="menu-list">${menuSets.map((t) => `<li><span>${esc(t.name)}</span><b>${money0(t)}</b></li>`).join("")}</ul></div>
-    ${addOns.length ? `<div><h3>Add-ons</h3><ul class="menu-list">${addOns.map((x) => `<li><span>${esc(x.name)}</span><b>${Number(x.price) > 0 ? "+" + money(x.price) : "Price varies"}</b></li>`).join("")}</ul></div>` : ""}
-  </div>
-  <p class="center"><a class="btn btn-pink" href="/book/#book">Book here</a> <a class="btn btn-quiet" href="/services/">Full price list</a></p>
-</div></section>
-
-<section class="section details"><div class="wrap split">
-  <figure class="split-pic${detailPic ? "" : " marble"}">${detailPic ? img(detailPic, "") : `<img src="/logo.webp" alt="" width="320" height="320" loading="lazy">`}</figure>
-  <div class="split-copy">
-    <h2>Get lost <em>in the details</em></h2>
-    <div class="prose">${md(String(a.body || "").split(/\n\n/)[0] || "")}</div>
-    <ol class="how">
-      <li><b>Pick your set</b><span>Choose the extension, a time and your place.</span></li>
-      <li><b>Pay the advance</b><span>Scan the UPI QR. Your slot is held right away.</span></li>
-      <li><b>We confirm</b><span>We check your inspo and confirm on WhatsApp.</span></li>
-      <li><b>Nail day</b><span>We arrive with the full kit. You relax.</span></li>
-    </ol>
-    <a class="btn btn-primary" href="/about/">Our story</a>
-  </div>
+<section class="section"><div class="wrap">
+  <div class="sec-head"><h2>Nail extensions <em>at home</em></h2><a class="more" href="/services/">Full price list</a></div>
+  <div class="svc-grid">${c.config.extensionTypes.slice(0, 6).map((t) => `<a class="svc card" href="/book/#book"><h3>${esc(t.name)}</h3><p>${esc(t.description || "")}</p><span class="svc-price">from ${money(t.price)}</span></a>`).join("")}</div>
 </div></section>
 
 ${shopPicks.length ? `<section class="section"><div class="wrap">
-  <div class="sec-head"><div><p class="kicker">Shop</p><h2>Press-on <em>drops</em></h2></div><a class="more" href="/shop/">Shop all</a></div>
+  <div class="sec-head"><h2>Press-on <em>drops</em></h2><a class="more" href="/shop/">Shop all</a></div>
   <div class="pgrid">${shopPicks.map((p) => productCard(c, p, now)).join("")}</div>
 </div></section>` : ""}
 
-${showReviews.length ? `<div class="ticker" aria-hidden="true"><div>${"<span>♥ Client love</span>".repeat(12)}</div></div>
-<section class="section"><div class="wrap">
-  <div class="sec-head"><div><p class="kicker">Reviews</p><h2>Client <em>love</em></h2></div><a class="more" href="/reviews/">All reviews</a></div>
-  <div class="review-grid rail">${showReviews.map(reviewCard).join("")}</div>
+${showReviews.length ? `<section class="section"><div class="wrap">
+  <div class="sec-head"><h2>Kind <em>words</em></h2><a class="more" href="/reviews/">All reviews</a></div>
+  <div class="review-grid">${showReviews.map(reviewCard).join("")}</div>
   ${k.googleReviewUrl ? `<p class="center"><a class="btn btn-quiet" href="${esc(k.googleReviewUrl)}" rel="noopener" target="_blank">Read our Google reviews</a></p>` : ""}
 </div></section>` : ""}
 
 ${c.posts.length ? `<section class="section"><div class="wrap">
-  <div class="sec-head"><div><p class="kicker">Journal</p><h2>From the <em>journal</em></h2></div><a class="more" href="/blog/">All posts</a></div>
+  <div class="sec-head"><h2>From the <em>blog</em></h2><a class="more" href="/blog/">All posts</a></div>
   <div class="post-grid">${c.posts.slice(0, 3).map(postCard).join("")}</div>
 </div></section>` : ""}
 
@@ -780,7 +752,7 @@ export function hi(c) {
 <link rel="icon" type="image/png" href="/favicon.png">
 <script>/* Seen the card before? Go straight on. */try{var t=new URLSearchParams(location.search).get("to")||"/";if(!/^\\/(?!\\/)/.test(t))t="/";window.__hiTo=t;if(localStorage.getItem("tt.hi.seen"))location.replace(t)}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Allura&family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Allura&family=Nunito:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="/styles.css">
 </head><body class="is-hi">${SPRITE}${body}
 <script type="module" src="/hi.js" data-seconds="${seconds}"></script>
