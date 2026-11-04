@@ -27,3 +27,22 @@ if (menu) {
 if ("serviceWorker" in navigator && !window.__ROOT && (location.protocol === "https:" || location.hostname === "localhost")) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 }
+
+// Gentle reveal of sections as they scroll into view. Anything at or above the
+// fold is shown at once, so a fast scroll or an anchor jump never leaves gaps.
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  let pending = $$("main .section .sec-head, main .svc, main .pcard, main .review, main .postcard, main .how li, main .igband")
+    .filter((el) => el.getBoundingClientRect().top > innerHeight);
+  pending.forEach((el) => el.classList.add("reveal"));
+  const check = () => {
+    const fold = innerHeight * 0.92;
+    pending = pending.filter((el) => {
+      if (el.getBoundingClientRect().top >= fold) return true;
+      el.classList.add("in");
+      return false;
+    });
+    if (!pending.length) removeEventListener("scroll", onScroll);
+  };
+  const onScroll = () => check();
+  if (pending.length) { addEventListener("scroll", onScroll, { passive: true }); addEventListener("resize", onScroll); }
+}
