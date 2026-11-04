@@ -66,6 +66,25 @@ export function themeCss(c) {
   return vars.length ? `<style>:root{${vars.join(";")}}</style>` : "";
 }
 
+/* Opening screen: the four booking steps play once per visit, then fade into the page.
+   Pure CSS timing, so it always ends even if a script fails. Skipped for reduced motion. */
+function splash(c) {
+  if (!shows(c, "steps")) return "";
+  const steps = (c.site.texts.steps || []).filter((x) => x && x.title).slice(0, 4);
+  if (!steps.length) return "";
+  return `<div class="splash" role="dialog" aria-label="How booking works" style="--n:${steps.length}">
+  <div class="splash-inner">
+    <img class="splash-logo" src="/logo.webp" alt="" width="84" height="84">
+    <p class="splash-brand">${esc(c.site.brand.name)}</p>
+    <p class="eyebrow splash-eyebrow">Your set in ${steps.length} easy steps</p>
+    <ol class="splash-steps">${steps.map((x, i) => `<li style="--i:${i}"><span class="splash-num">${i + 1}</span><b>${esc(x.title)}</b><span class="splash-text">${esc(x.text || "")}</span></li>`).join("")}</ol>
+    <div class="splash-bar" aria-hidden="true">${steps.map((_, i) => `<i style="--i:${i}"></i>`).join("")}</div>
+    <svg class="bunny splash-bunny" aria-hidden="true"><use href="#bunny"/></svg>
+  </div>
+  <button type="button" class="splash-skip" onclick="document.documentElement.classList.remove('splash-on')">Skip</button>
+</div>`;
+}
+
 function addressLine(c) {
   const k = c.site.contact;
   if (!k.address && !k.area) return "";
@@ -217,11 +236,13 @@ ${noindex ? '<meta name="robots" content="noindex, follow">' : `<link rel="canon
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Allura&family=Nunito:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="/styles.css">
 ${themeCss(c)}
+${splash(c) ? `<script>try{if(!sessionStorage.getItem("tt.splash")&&!matchMedia("(prefers-reduced-motion: reduce)").matches){document.documentElement.classList.add("splash-on");sessionStorage.setItem("tt.splash","1")}}catch(e){}</script>` : ""}
 ${head}
 ${jsonld.map(ld).join("\n")}
 </head>
 <body class="${bodyClass}">
 ${SPRITE}
+${splash(c)}
 <a class="skip" href="#main">Skip to content</a>
 <div id="previewBanner" class="preview-banner"${c.demo ? "" : " hidden"}>Preview with sample content. Connect Firebase in <code>config.js</code> to go live.</div>
 ${offerStrip(c)}
@@ -387,10 +408,6 @@ export function home(c, now) {
     </div>
   </div>
 </section>
-
-${shows(c, "steps") ? `<section class="steps-strip" aria-label="How booking works">
-  <ol class="how">${(c.site.texts.steps || []).slice(0, 4).map((x) => `<li><b>${esc(x.title || "")}</b><span>${esc(x.text || "")}</span></li>`).join("")}</ol>
-</section>` : ""}
 
 ${shows(c, "services") ? `<section class="section"><div class="wrap">
   <div class="sec-head"><h2>${rich(tx(c, "home.servicesTitle"))}</h2><a class="more" href="/services/">${esc(tx(c, "home.servicesLink"))}</a></div>

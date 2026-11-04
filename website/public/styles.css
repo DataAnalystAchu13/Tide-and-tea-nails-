@@ -1026,3 +1026,41 @@ h2 { color: var(--ink); }
 /* Contact: map card matches the cards beside it instead of towering over them */
 @media (min-width: 761px) { .mapframe { align-self: start; min-height: 0; } .mapframe iframe { min-height: 300px; } }
 .site-foot .copy { color: var(--muted); }
+
+/* =====================================================================
+   Opening screen: the four booking steps, once per visit.
+   Each step shows for --step, then the screen fades out on its own.
+   ===================================================================== */
+.splash { display: none; }
+.splash-on .splash {
+  --step: .75s;
+  display: grid; place-items: center; position: fixed; inset: 0; z-index: 1000; padding: 24px;
+  background: var(--clouds), var(--sky); background-color: var(--sky-2); color: var(--ink); text-align: center;
+  animation: splash-out .5s ease calc(var(--n) * var(--step) + .5s) forwards;
+}
+.splash-inner { position: relative; width: min(360px, 100%); display: grid; justify-items: center; }
+.splash-logo { width: 84px; height: 84px; border-radius: 50%; box-shadow: 0 0 0 8px rgba(255,255,255,.45), 0 20px 40px -24px rgba(60,50,100,.6);
+  animation: splash-pop .6s cubic-bezier(.2,1.4,.4,1) both; }
+.splash-brand { font: 500 1.6rem var(--display); text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 4px; }
+.splash-eyebrow { margin: 0 0 22px; }
+.splash-steps { list-style: none; margin: 0; padding: 0; display: grid; width: 100%; min-height: 150px; }
+.splash-steps li { grid-area: 1 / 1; display: grid; justify-items: center; gap: 6px; padding: 22px 20px; border-radius: var(--r-lg);
+  background: rgba(255,255,255,.72); box-shadow: var(--shadow); opacity: 0;
+  animation: splash-step var(--step) ease calc(.35s + var(--i) * var(--step)) both; }
+.splash-steps li:last-child { animation-name: splash-last; }
+.splash-num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--royal); color: #fff; font-weight: 800; }
+.splash-steps b { font: 600 1.5rem var(--display); }
+.splash-text { color: #4a4656; font-size: .95rem; line-height: 1.45; }
+.splash-bar { display: flex; gap: 6px; width: 60%; margin-top: 20px; }
+.splash-bar i { flex: 1; height: 4px; border-radius: 4px; background: rgba(38,36,46,.12); overflow: hidden; position: relative; }
+.splash-bar i::after { content: ""; position: absolute; inset: 0; background: var(--royal); transform: scaleX(0); transform-origin: left;
+  animation: splash-fill var(--step) linear calc(.35s + var(--i) * var(--step)) forwards; }
+.splash-bunny { position: absolute; width: 64px; height: 70px; right: -6px; top: 40px; transform: rotate(8deg); }
+.splash-skip { position: absolute; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+  min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: rgba(255,255,255,.6); color: var(--ink);
+  font: 800 .76rem var(--body); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+@keyframes splash-step { 0% { opacity: 0; transform: translateY(14px) scale(.98); } 18%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-10px); } }
+@keyframes splash-last { 0% { opacity: 0; transform: translateY(14px) scale(.98); } 18%, 100% { opacity: 1; transform: none; } }
+@keyframes splash-fill { to { transform: scaleX(1); } }
+@keyframes splash-pop { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
