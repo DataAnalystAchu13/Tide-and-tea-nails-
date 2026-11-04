@@ -72,14 +72,27 @@ function splash(c) {
   if (!shows(c, "steps")) return "";
   const steps = (c.site.texts.steps || []).filter((x) => x && x.title).slice(0, 4);
   if (!steps.length) return "";
+  const ab = c.site.about || {};
+  const photo = ab.photo || "";
+  const sig = String(ab.signature || "").trim();
+  const sparkle = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0c.6 6.2 5.8 11.4 12 12-6.2.6-11.4 5.8-12 12-.6-6.2-5.8-11.4-12-12C6.2 11.4 11.4 6.2 12 0z"/></svg>`;
+  const ribbon = (cls) => `<svg class="spl-ribbon ${cls}" viewBox="0 0 200 200" aria-hidden="true"><path d="M-20 170 C 40 120, 70 150, 110 90 S 170 20, 230 -10" /><path d="M-20 190 C 50 140, 80 165, 120 105 S 180 40, 230 10" /></svg>`;
   return `<div class="splash" role="dialog" aria-label="How booking works" style="--n:${steps.length}">
-  <div class="splash-inner">
-    <img class="splash-logo" src="/logo.webp" alt="" width="84" height="84">
-    <p class="splash-brand">${esc(c.site.brand.name)}</p>
-    <p class="eyebrow splash-eyebrow">Your set in ${steps.length} easy steps</p>
-    <ol class="splash-steps">${steps.map((x, i) => `<li style="--i:${i}"><span class="splash-num">${i + 1}</span><b>${esc(x.title)}</b><span class="splash-text">${esc(x.text || "")}</span></li>`).join("")}</ol>
-    <div class="splash-bar" aria-hidden="true">${steps.map((_, i) => `<i style="--i:${i}"></i>`).join("")}</div>
-    <svg class="bunny splash-bunny" aria-hidden="true"><use href="#bunny"/></svg>
+  ${ribbon("tl")}${ribbon("br")}
+  <div class="spl-stage">
+    <div class="spl-phase spl-logo"><img src="/logo.webp" alt="${esc(c.site.brand.name)}" width="132" height="132"></div>
+    <div class="spl-phase spl-load">
+      <p class="spl-title">${sparkle}<span>Bling away in ${steps.length} steps</span>${sparkle}</p>
+      <ol class="spl-steps">${steps.map((x, i) => `<li style="--i:${i}"><span class="spl-num">${i + 1}</span><b>${esc(x.title)}</b><span class="spl-text">${esc(x.text || "")}</span></li>`).join("")}</ol>
+      <div class="spl-progress" aria-hidden="true"><i></i></div>
+      <p class="spl-loading">Loading…</p>
+    </div>
+    ${photo ? `<div class="spl-phase spl-thanks">
+      <img src="${esc(photo)}" alt="" width="132" height="132">
+      <p class="spl-title"><span>Thank you for visiting</span></p>
+      <p class="spl-text">So grateful you're here. Let's make your nails pretty 🤍</p>
+      ${sig ? `<p class="spl-sig">${esc(sig)}</p>` : ""}
+    </div>` : ""}
   </div>
   <button type="button" class="splash-skip" onclick="document.documentElement.classList.remove('splash-on')">Skip</button>
 </div>`;
