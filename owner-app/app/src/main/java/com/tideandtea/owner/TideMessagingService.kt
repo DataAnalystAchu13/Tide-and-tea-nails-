@@ -21,7 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Receives pushes sent by the Cloud Functions in website/functions.
+ * Receives pushes sent by the notify-owners Supabase Edge Function (supabase/functions).
  * When the app is closed, Android shows the notification by itself; this service
  * handles the app-open case and keeps this phone's token up to date.
  */

@@ -1,9 +1,8 @@
 package com.tideandtea.owner.data
 
-import com.google.firebase.Timestamp
-import com.google.firebase.firestore.DocumentSnapshot
+import kotlinx.serialization.json.JsonObject
 
-/** chats/{bookingId}: one conversation per booking. */
+/** public.chats: one conversation per booking (maintained by a database trigger). */
 data class ChatSummary(
     val bookingId: String,
     val name: String,
@@ -13,20 +12,20 @@ data class ChatSummary(
     val ownerUnread: Int,
 ) {
     companion object {
-        fun from(doc: DocumentSnapshot) = ChatSummary(
-            bookingId = doc.id,
-            name = doc.getString("name") ?: "Client",
-            lastText = doc.getString("lastText") ?: "",
-            lastFrom = doc.getString("lastFrom") ?: "",
-            lastAtMillis = doc.getTimestamp("lastAt")?.toDate()?.time ?: 0L,
-            ownerUnread = doc.getLong("ownerUnread")?.toInt() ?: 0,
+        fun from(r: JsonObject) = ChatSummary(
+            bookingId = r.str("booking_id"),
+            name = r.str("name").ifBlank { "Client" },
+            lastText = r.str("last_text"),
+            lastFrom = r.str("last_from"),
+            lastAtMillis = r.millis("last_at"),
+            ownerUnread = r.int("owner_unread"),
         )
     }
 }
 
 enum class MediaType { IMAGE, VIDEO }
 
-/** chats/{bookingId}/messages/{id} */
+/** public.messages */
 data class ChatMessage(
     val id: String,
     val fromOwner: Boolean,
@@ -37,32 +36,33 @@ data class ChatMessage(
     val pending: Boolean,
 ) {
     companion object {
-        fun from(doc: DocumentSnapshot) = ChatMessage(
-            id = doc.id,
-            fromOwner = doc.getString("from") == "owner",
-            text = doc.getString("text") ?: "",
-            mediaUrl = doc.getString("mediaUrl"),
-            mediaType = when (doc.getString("mediaType")) {
+        fun from(r: JsonObject) = ChatMessage(
+            id = r.str("id"),
+            fromOwner = r.str("sender") == "owner",
+            text = r.str("text"),
+            mediaUrl = r.strOrNull("media_url"),
+            mediaType = when (r.strOrNull("media_type")) {
                 "image" -> MediaType.IMAGE
                 "video" -> MediaType.VIDEO
                 else -> null
             },
-            atMillis = (doc.get("at") as? Timestamp)?.toDate()?.time ?: System.currentTimeMillis(),
-            pending = doc.metadata.hasPendingWrites(),
+            atMillis = r.millis("created_at").takeIf { it > 0 } ?: System.currentTimeMillis(),
+            pending = false,
         )
     }
 }
 
 enum class PaymentKind(val key: String, val label: String) {
     ADVANCE("advance", "Advance"),
-    BALANCE("balance", "Balance");
+    BALANCE("balance", "Balance"),
+    SHOP("shop", "Shop order");
 
     companion object {
         fun from(k: String?) = entries.firstOrNull { it.key == k } ?: ADVANCE
     }
 }
 
-/** payments/{id}: written by the owner app when money is confirmed. */
+/** public.payments: written by database triggers when a booking is confirmed or completed. */
 data class Payment(
     val id: String,
     val bookingId: String,
@@ -74,15 +74,15 @@ data class Payment(
     val atMillis: Long,
 ) {
     companion object {
-        fun from(doc: DocumentSnapshot) = Payment(
-            id = doc.id,
-            bookingId = doc.getString("bookingId") ?: "",
-            name = doc.getString("name") ?: "",
-            amount = doc.getLong("amount")?.toInt() ?: 0,
-            kind = PaymentKind.from(doc.getString("kind")),
-            method = doc.getString("method") ?: "",
-            reference = doc.getString("reference") ?: "",
-            atMillis = doc.getTimestamp("at")?.toDate()?.time ?: 0L,
+        fun from(r: JsonObject) = Payment(
+            id = r.str("id"),
+            bookingId = r.str("booking_id"),
+            name = r.str("name"),
+            amount = r.int("amount"),
+            kind = PaymentKind.from(r.strOrNull("kind")),
+            method = r.str("method"),
+            reference = r.str("reference"),
+            atMillis = r.millis("created_at"),
         )
     }
 }

@@ -1,0 +1,7 @@
+# Supabase CLI settings used by .github/workflows/deploy-supabase.yml.
+# Only the values that differ from the CLI defaults are listed.
+project_id = "tide-and-tea-nails"
+
+# Called by the database (pg_net) with a shared secret, not by signed-in users.
+[functions.notify-owners]
+verify_jwt = false

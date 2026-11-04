@@ -1,8 +1,9 @@
 import { DEFAULT_CONFIG, mergeConfig, quote, distanceKm } from "./defaults.js";
 
 const SETTINGS = window.TIDE_SETTINGS || {};
-const FB = SETTINGS.FIREBASE_CONFIG || {};
-const PREVIEW = !FB.apiKey || FB.apiKey.startsWith("PASTE");
+const SB_URL = String(SETTINGS.SUPABASE_URL || "").replace(/\/+$/, "");
+const SB_KEY = String(SETTINGS.SUPABASE_ANON_KEY || "");
+const PREVIEW = !SB_URL.startsWith("https://") || !SB_KEY || SB_KEY.startsWith("PASTE");
 const MAPS_KEY = SETTINGS.MAPS_API_KEY && !SETTINGS.MAPS_API_KEY.startsWith("PASTE") ? SETTINGS.MAPS_API_KEY : "";
 const MAX_INSPO = 10;
 const MAX_NATURAL = 5;
@@ -14,100 +15,118 @@ let cfg = mergeConfig(null);
 const money = (n) => `${cfg.currency}${Number(n || 0).toLocaleString("en-IN")}`;
 
 /* ------------------------------------------------------------------ */
-/* Backend: Firebase when configured, a browser-only stand-in otherwise */
+/* Backend: Supabase when configured, a browser-only stand-in otherwise */
 /* ------------------------------------------------------------------ */
 
-async function firebaseBackend() {
-  const v = "10.14.1";
-  const base = `https://www.gstatic.com/firebasejs/${v}/`;
-  const [{ initializeApp }, authMod, fs, st] = await Promise.all([
-    import(base + "firebase-app.js"),
-    import(base + "firebase-auth.js"),
-    import(base + "firebase-firestore.js"),
-    import(base + "firebase-storage.js"),
-  ]);
-  const app = initializeApp(FB);
-  const auth = authMod.getAuth(app);
-  const db = fs.getFirestore(app);
-  const storage = st.getStorage(app);
+async function supabaseBackend() {
+  const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm");
+  const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
-  const uid = await new Promise((resolve, reject) => {
-    const off = authMod.onAuthStateChanged(auth, (u) => {
-      if (u) { off(); resolve(u.uid); }
-    });
-    authMod.signInAnonymously(auth).catch(reject);
+  // Customers book without an account: one anonymous user per browser, kept in localStorage.
+  let { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    const { data, error } = await sb.auth.signInAnonymously();
+    if (error) throw error;
+    session = data.session;
+  }
+  const uid = session.user.id;
+  const token = async () => (await sb.auth.getSession()).data.session?.access_token || SB_KEY;
+
+  // Runs fetch() now and again whenever a matching row changes (Realtime honours RLS).
+  const live = (table, filter, fetch, cb) => {
+    let alive = true, queued = false;
+    const run = async () => {
+      if (queued) return; queued = true;
+      await new Promise((r) => setTimeout(r, 120)); queued = false;
+      try { const v = await fetch(); if (alive) cb(v); } catch (e) { console.warn(table, e); }
+    };
+    const ch = sb.channel(`${table}:${filter || "all"}:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table, ...(filter ? { filter } : {}) }, run)
+      .subscribe((status) => { if (status === "SUBSCRIBED") run(); });
+    run();
+    return () => { alive = false; sb.removeChannel(ch); };
+  };
+  const must = ({ data, error }) => { if (error) throw error; return data; };
+
+  const toBooking = (r) => ({
+    id: r.id, customerUid: r.customer_uid, status: r.status, name: r.name, phone: r.phone, from: r.from_place,
+    instagram: r.instagram, notes: r.notes, extension: r.extension, length: r.length, shape: r.shape, addOns: r.add_ons,
+    date: r.date, slot: r.slot, serviceMode: r.service_mode, location: r.location, distanceKm: Number(r.distance_km),
+    inspoUrls: r.inspo_urls, naturalUrls: r.natural_urls, price: r.price, ownerNote: r.owner_note, paymentRef: r.payment_ref,
+    createdAt: Date.parse(r.created_at),
   });
+  const toMessage = (m) => ({ id: m.id, from: m.sender, text: m.text, mediaUrl: m.media_url, mediaType: m.media_type, at: Date.parse(m.created_at) });
+
+  // Upload with progress (supabase-js has no progress callback), returns the public URL.
+  const put = (bucket, path, blob, onProgress) => token().then((jwt) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${SB_URL}/storage/v1/object/${bucket}/${path}`);
+    xhr.setRequestHeader("Authorization", `Bearer ${jwt}`);
+    xhr.setRequestHeader("apikey", SB_KEY);
+    xhr.setRequestHeader("Content-Type", blob.type || "application/octet-stream");
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / Math.max(1, e.total));
+    xhr.onload = () => (xhr.status < 300
+      ? resolve(`${SB_URL}/storage/v1/object/public/${bucket}/${path}`)
+      : reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText}`)));
+    xhr.onerror = () => reject(new Error("Upload failed: network error"));
+    xhr.send(blob);
+  }));
 
   return {
     uid,
     watchConfig(cb) {
-      return fs.onSnapshot(fs.doc(db, "config", "main"), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
+      return live("config", "id=eq.main",
+        async () => must(await sb.from("config").select("data").eq("id", "main").maybeSingle())?.data || null, cb);
     },
     watchTaken(date, cb) {
-      return fs.onSnapshot(fs.doc(db, "slots", date), (s) => cb((s.exists() && s.data().taken) || []), () => cb([]));
+      // No filter: Realtime cannot filter DELETE events, and a freed slot must show up.
+      return live("slots_taken", null,
+        async () => must(await sb.from("slots_taken").select("slot").eq("date", date)).map((r) => r.slot), cb);
     },
     watchMine(cb) {
-      const q = fs.query(fs.collection(db, "bookings"), fs.where("customerUid", "==", uid));
-      return fs.onSnapshot(q, (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-        cb(list);
-      }, (e) => { console.error(e); cb([]); });
+      return live("bookings", `customer_uid=eq.${uid}`, async () =>
+        must(await sb.from("bookings").select("*").eq("customer_uid", uid).order("created_at", { ascending: false }).limit(50)).map(toBooking), cb);
     },
-    newId() { return fs.doc(fs.collection(db, "bookings")).id; },
+    newId() { return crypto.randomUUID(); },
     upload(bookingId, name, blob, onProgress) {
-      const r = st.ref(storage, `bookings/${uid}/${bookingId}/${name}`);
-      const task = st.uploadBytesResumable(r, blob, { contentType: blob.type || "image/jpeg" });
-      return new Promise((resolve, reject) => {
-        task.on("state_changed", (s) => onProgress(s.bytesTransferred / Math.max(1, s.totalBytes)), reject,
-          async () => resolve(await st.getDownloadURL(task.snapshot.ref)));
-      });
+      return put("bookings", `${uid}/${bookingId}/${name}`, blob, onProgress);
     },
-    async create(id, data) {
-      await fs.setDoc(fs.doc(db, "bookings", id), {
-        ...data, customerUid: uid, status: "requested",
-        createdAt: fs.serverTimestamp(), updatedAt: fs.serverTimestamp(),
-      });
+    async create(id, d) {
+      must(await sb.from("bookings").insert({
+        id, name: d.name, phone: d.phone, from_place: d.from || "", instagram: d.instagram || "", notes: d.notes || "",
+        extension: d.extension, length: d.length, shape: d.shape || "", add_ons: d.addOns || [],
+        date: d.date, slot: d.slot, service_mode: d.serviceMode, location: d.location, distance_km: d.distanceKm || 0,
+        inspo_urls: d.inspoUrls, natural_urls: d.naturalUrls, price: d.price,
+      }));
     },
     async submitPayment(id, ref) {
-      await fs.updateDoc(fs.doc(db, "bookings", id), {
-        status: "payment_submitted", paymentRef: ref, paymentSubmittedAt: fs.serverTimestamp(), updatedAt: fs.serverTimestamp(),
-      });
+      must(await sb.rpc("submit_payment", { p_booking_id: id, p_ref: ref }));
     },
     watchChat(id, cb) {
-      const q = fs.query(fs.collection(db, "chats", id, "messages"), fs.orderBy("at"), fs.limitToLast(200));
-      return fs.onSnapshot(q, (snap) => cb(snap.docs.map((d) => {
-        const m = d.data();
-        return { id: d.id, ...m, at: m.at?.toMillis?.() || Date.now(), pending: d.metadata.hasPendingWrites };
-      })), (e) => { console.warn(e); cb([]); });
+      return live("messages", `booking_id=eq.${id}`, async () =>
+        must(await sb.from("messages").select("*").eq("booking_id", id).order("created_at", { ascending: false }).limit(200))
+          .reverse().map(toMessage), cb);
     },
     watchChatMeta(id, cb) {
-      return fs.onSnapshot(fs.doc(db, "chats", id), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
+      return live("chats", `booking_id=eq.${id}`, async () => {
+        const r = must(await sb.from("chats").select("customer_unread").eq("booking_id", id).maybeSingle());
+        return r ? { customerUnread: r.customer_unread } : null;
+      }, cb);
     },
     async markChatRead(id) {
-      try { await fs.updateDoc(fs.doc(db, "chats", id), { customerUnread: 0 }); } catch {}
+      try { await sb.rpc("mark_chat_read", { p_booking_id: id }); } catch {}
     },
     async sendChat(b, text, file, onProgress) {
-      const msgRef = fs.doc(fs.collection(db, "chats", b.id, "messages"));
-      const data = { from: "customer", text, at: fs.serverTimestamp() };
+      const row = { booking_id: b.id, sender: "customer", text };
       if (file) {
         const isVideo = file.type.startsWith("video/");
         const blob = isVideo ? file : await shrink(file);
         const ext = isVideo ? (file.name.split(".").pop() || "mp4").toLowerCase() : "jpg";
-        const r = st.ref(storage, `chats/${b.id}/${msgRef.id}.${ext}`);
-        const task = st.uploadBytesResumable(r, blob, { contentType: blob.type || (isVideo ? "video/mp4" : "image/jpeg") });
-        await new Promise((res, rej) => task.on("state_changed", (x) => onProgress(x.bytesTransferred / Math.max(1, x.totalBytes)), rej, res));
-        data.mediaUrl = await st.getDownloadURL(task.snapshot.ref);
-        data.mediaType = isVideo ? "video" : "image";
+        row.media_url = await put("chats", `${b.id}/${crypto.randomUUID()}.${ext}`, blob, onProgress);
+        row.media_type = isVideo ? "video" : "image";
       }
-      const batch = fs.writeBatch(db);
-      batch.set(msgRef, data);
-      batch.set(fs.doc(db, "chats", b.id), {
-        customerUid: uid, name: b.name, lastFrom: "customer", lastAt: fs.serverTimestamp(),
-        lastText: text || (data.mediaType === "video" ? "Video" : "Photo"),
-        ownerUnread: fs.increment(1), customerUnread: 0,
-      }, { merge: true });
-      await batch.commit();
+      must(await sb.from("messages").insert(row));
     },
   };
 }
@@ -889,7 +908,7 @@ async function boot() {
   renderPrices();
   renderStep();
   try {
-    backend = PREVIEW ? previewBackend() : await firebaseBackend();
+    backend = PREVIEW ? previewBackend() : await supabaseBackend();
   } catch (e) {
     console.error(e);
     showError("We couldn't connect. Check your internet and refresh the page.");

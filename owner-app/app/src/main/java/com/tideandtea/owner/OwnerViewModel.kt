@@ -6,9 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.FirebaseNetworkException
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import io.github.jan.supabase.auth.exception.AuthErrorCode
+import io.github.jan.supabase.auth.exception.AuthRestException
+import io.github.jan.supabase.exceptions.HttpRequestException
 import android.net.Uri
 import com.tideandtea.owner.data.Booking
 import com.tideandtea.owner.data.ChatMessage
@@ -110,11 +110,13 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
                 listen()
             } catch (e: NotOwnerException) {
                 loginError = e.message
-            } catch (e: FirebaseAuthInvalidCredentialsException) {
-                loginError = "That email and password don't match."
-            } catch (e: FirebaseAuthInvalidUserException) {
-                loginError = "No account with that email."
-            } catch (e: FirebaseNetworkException) {
+            } catch (e: AuthRestException) {
+                loginError = when (e.errorCode) {
+                    AuthErrorCode.InvalidCredentials -> "That email and password don't match."
+                    AuthErrorCode.EmailNotConfirmed -> "Confirm your email first (check your inbox), or mark the user as confirmed in Supabase."
+                    else -> e.message ?: "Couldn't sign in."
+                }
+            } catch (e: HttpRequestException) {
                 loginError = "No internet connection."
             } catch (e: Exception) {
                 loginError = e.message ?: "Couldn't sign in."
@@ -155,9 +157,9 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
     fun publishPriceList() = viewModelScope.launch {
         try {
             message = if (repo.publishDefaultPriceList(getApplication())) {
-                "Price list published. Edit it any time in Firestore at config/main."
+                "Price list published. Edit it any time in Supabase: Table Editor > config > main."
             } else {
-                "A price list already exists in Firestore (config/main), so nothing was changed."
+                "A price list already exists in Supabase (config > main), so nothing was changed."
             }
         } catch (e: Exception) {
             message = "Couldn't publish: ${e.message}"

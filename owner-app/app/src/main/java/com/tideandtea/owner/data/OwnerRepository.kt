@@ -2,178 +2,169 @@ package com.tideandtea.owner.data
 
 import android.content.Context
 import android.net.Uri
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.SetOptions
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.rpc
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
+import io.github.jan.supabase.realtime.realtime
+import io.github.jan.supabase.storage.storage
+import io.ktor.http.ContentType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.util.UUID
 
 class NotOwnerException : Exception(
-    "This account isn't set up as a studio owner yet. Add its user ID under \"owners\" in Firestore (see SETUP.md)."
+    "This account isn't set up as a studio owner yet. Add its user ID to the owners table in Supabase (see SETUP.md)."
 )
 
-/** All reads and writes the owner app makes. Security rules only let owner accounts do these. */
-class OwnerRepository(
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
-) {
-    val signedInEmail: String? get() = auth.currentUser?.email
+/**
+ * All reads and writes the owner app makes. Row-level security in supabase/migrations only lets
+ * owner accounts do these. Payments, taken slots and chat summaries are kept up to date by
+ * database triggers, so the app only changes bookings and sends messages.
+ */
+class OwnerRepository(private val supabase: SupabaseClient = Supa.client) {
+    val signedInEmail: String? get() = supabase.auth.currentUserOrNull()?.email
 
     suspend fun isOwner(): Boolean {
-        val uid = auth.currentUser?.uid ?: return false
-        return runCatching { db.collection("owners").document(uid).get().await().exists() }.getOrDefault(false)
+        supabase.auth.awaitInitialization()
+        val uid = supabase.auth.currentUserOrNull()?.id ?: return false
+        return runCatching {
+            supabase.from("owners").select { filter { eq("user_id", uid) } }.decodeList<JsonObject>().isNotEmpty()
+        }.getOrDefault(false)
     }
 
     suspend fun signIn(email: String, password: String) {
-        auth.signInWithEmailAndPassword(email.trim(), password).await()
+        supabase.auth.signInWith(Email) {
+            this.email = email.trim()
+            this.password = password
+        }
         if (!isOwner()) {
-            val uid = auth.currentUser?.uid
-            auth.signOut()
+            val uid = supabase.auth.currentUserOrNull()?.id
+            supabase.auth.signOut()
             throw NotOwnerException().also { android.util.Log.w("TideOwner", "Not an owner. uid=$uid") }
         }
     }
 
-    fun signOut() = auth.signOut()
+    suspend fun signOut() = supabase.auth.signOut()
+
+    /**
+     * Emits [fetch] now and again after every change to [table]. Realtime only delivers rows
+     * this account may read, and a refetch keeps the logic identical to the first load.
+     */
+    private fun <T> live(table: String, fetch: suspend () -> T): Flow<T> = channelFlow {
+        val channel = supabase.channel("$table-${UUID.randomUUID()}")
+        val changes = channel.postgresChangeFlow<PostgresAction>(schema = "public") { this.table = table }
+        launch { changes.conflate().collect { send(fetch()) } }
+        channel.subscribe()
+        send(fetch())
+        awaitClose {
+            CoroutineScope(Dispatchers.IO).launch {
+                withContext(NonCancellable) { runCatching { supabase.realtime.removeChannel(channel) } }
+            }
+        }
+    }.conflate()
 
     /** Live list of the latest bookings, newest first. */
-    fun bookings(): Flow<List<Booking>> = callbackFlow {
-        val reg = db.collection("bookings")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(300)
-            .addSnapshotListener { snap, err ->
-                if (err != null) {
-                    close(err); return@addSnapshotListener
-                }
-                if (snap != null) trySend(snap.documents.map { Booking.from(it) })
-            }
-        awaitClose { reg.remove() }
+    fun bookings(): Flow<List<Booking>> = live("bookings") {
+        supabase.from("bookings").select {
+            order("created_at", Order.DESCENDING)
+            limit(300)
+        }.decodeList<JsonObject>().map(Booking::from)
     }
 
-    private fun ref(id: String) = db.collection("bookings").document(id)
+    private suspend fun update(b: Booking, values: JsonObject) {
+        supabase.from("bookings").update(values) { filter { eq("id", b.id) } }
+    }
 
-    /** Approve with the final price; the slot is marked taken so customers can't pick it. */
+    /** Approve with the final price. The database marks the slot as taken. */
     suspend fun approve(b: Booking, total: Int, advance: Int, note: String) {
-        db.batch()
-            .update(
-                ref(b.id), mapOf(
-                    "status" to BookingStatus.APPROVED.key,
-                    "price.total" to total,
-                    "price.advance" to advance,
-                    "ownerNote" to note,
-                    "approvedAt" to FieldValue.serverTimestamp(),
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                )
-            )
-            .set(db.collection("slots").document(b.date), mapOf("taken" to FieldValue.arrayUnion(b.slot)), SetOptions.merge())
-            .commit().await()
+        update(b, buildJsonObject {
+            put("status", BookingStatus.APPROVED.key)
+            put("price", buildJsonObject {
+                put("base", b.price.base)
+                put("length", b.price.length)
+                put("addOns", b.price.addOns)
+                put("travel", b.price.travel)
+                put("total", total)
+                put("advance", advance)
+            })
+            put("owner_note", note)
+        })
     }
 
+    /** Declines; if the slot had been held, the database frees it. */
     suspend fun decline(b: Booking, note: String) {
-        val batch = db.batch().update(
-            ref(b.id), mapOf(
-                "status" to BookingStatus.DECLINED.key,
-                "ownerNote" to note,
-                "updatedAt" to FieldValue.serverTimestamp(),
-            )
-        )
-        if (b.status != BookingStatus.REQUESTED) {
-            batch.set(db.collection("slots").document(b.date), mapOf("taken" to FieldValue.arrayRemove(b.slot)), SetOptions.merge())
-        }
-        batch.commit().await()
+        update(b, buildJsonObject {
+            put("status", BookingStatus.DECLINED.key)
+            put("owner_note", note)
+        })
     }
 
-    /** Confirms the advance and records it in payment history. */
+    /** Confirms the advance. The database records it in payment history. */
     suspend fun confirmPayment(b: Booking) {
-        db.batch()
-            .update(
-                ref(b.id), mapOf(
-                    "status" to BookingStatus.CONFIRMED.key,
-                    "confirmedAt" to FieldValue.serverTimestamp(),
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                )
-            )
-            .set(db.collection("payments").document("${b.id}_advance"), paymentDoc(b, PaymentKind.ADVANCE, b.price.advance, "UPI", b.paymentRef))
-            .commit().await()
+        update(b, buildJsonObject { put("status", BookingStatus.CONFIRMED.key) })
     }
-
-    private fun paymentDoc(b: Booking, kind: PaymentKind, amount: Int, method: String, reference: String) = mapOf(
-        "bookingId" to b.id,
-        "name" to b.name,
-        "amount" to amount,
-        "kind" to kind.key,
-        "method" to method,
-        "reference" to reference,
-        "service" to (b.extension?.name ?: ""),
-        "at" to FieldValue.serverTimestamp(),
-    )
 
     suspend fun paymentNotFound(b: Booking) {
-        ref(b.id).update(
-            mapOf(
-                "status" to BookingStatus.APPROVED.key,
-                "paymentRef" to "",
-                "ownerNote" to "We couldn't find a payment with reference ${b.paymentRef}. Please check and send it again.",
-                "updatedAt" to FieldValue.serverTimestamp(),
-            )
-        ).await()
+        update(b, buildJsonObject {
+            put("status", BookingStatus.APPROVED.key)
+            put("payment_ref", "")
+            put("owner_note", "We couldn't find a payment with reference ${b.paymentRef}. Please check and send it again.")
+        })
     }
 
-    /** Marks the appointment done and records the balance collected on the day. */
+    /** Marks the appointment done. The database records the balance collected on the day. */
     suspend fun markDone(b: Booking, balanceMethod: String) {
-        val balance = (b.price.total - b.price.advance).coerceAtLeast(0)
-        val batch = db.batch().update(
-            ref(b.id), mapOf(
-                "status" to BookingStatus.COMPLETED.key,
-                "balanceMethod" to balanceMethod,
-                "completedAt" to FieldValue.serverTimestamp(),
-                "updatedAt" to FieldValue.serverTimestamp(),
-            )
-        )
-        if (balance > 0) batch.set(db.collection("payments").document("${b.id}_balance"), paymentDoc(b, PaymentKind.BALANCE, balance, balanceMethod, ""))
-        batch.commit().await()
+        update(b, buildJsonObject {
+            put("status", BookingStatus.COMPLETED.key)
+            put("balance_method", balanceMethod)
+        })
     }
 
-    fun payments(): Flow<List<Payment>> = callbackFlow {
-        val reg = db.collection("payments").orderBy("at", Query.Direction.DESCENDING).limit(500)
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                if (snap != null) trySend(snap.documents.map { Payment.from(it) })
-            }
-        awaitClose { reg.remove() }
+    fun payments(): Flow<List<Payment>> = live("payments") {
+        supabase.from("payments").select {
+            order("created_at", Order.DESCENDING)
+            limit(500)
+        }.decodeList<JsonObject>().map(Payment::from)
     }
 
     // ---------------- Chat ----------------
 
-    fun chats(): Flow<List<ChatSummary>> = callbackFlow {
-        val reg = db.collection("chats").orderBy("lastAt", Query.Direction.DESCENDING).limit(200)
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                if (snap != null) trySend(snap.documents.map { ChatSummary.from(it) })
-            }
-        awaitClose { reg.remove() }
+    fun chats(): Flow<List<ChatSummary>> = live("chats") {
+        supabase.from("chats").select {
+            order("last_at", Order.DESCENDING)
+            limit(200)
+        }.decodeList<JsonObject>().map(ChatSummary::from)
     }
 
-    fun messages(bookingId: String): Flow<List<ChatMessage>> = callbackFlow {
-        val reg = db.collection("chats").document(bookingId).collection("messages")
-            .orderBy("at", Query.Direction.ASCENDING).limitToLast(300)
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                if (snap != null) trySend(snap.documents.map { ChatMessage.from(it) })
-            }
-        awaitClose { reg.remove() }
+    fun messages(bookingId: String): Flow<List<ChatMessage>> = live("messages") {
+        supabase.from("messages").select {
+            filter { eq("booking_id", bookingId) }
+            order("created_at", Order.DESCENDING)
+            limit(300)
+        }.decodeList<JsonObject>().map(ChatMessage::from).reversed()
     }
 
     suspend fun markChatRead(bookingId: String) {
-        runCatching { db.collection("chats").document(bookingId).update("ownerUnread", 0).await() }
+        runCatching { supabase.postgrest.rpc("mark_chat_read", buildJsonObject { put("p_booking_id", bookingId) }) }
     }
 
     /** Uploads the photo or video (if any) to Storage, then posts the message. */
@@ -185,78 +176,65 @@ class OwnerRepository(
         contentType: String?,
         onProgress: (Float) -> Unit = {},
     ) {
-        val chat = db.collection("chats").document(b.id)
-        val msg = chat.collection("messages").document()
         var url: String? = null
         if (media != null && mediaType != null) {
-            val ext = if (mediaType == MediaType.VIDEO) "mp4" else "jpg"
-            val file = storage.reference.child("chats/${b.id}/${msg.id}.$ext")
-            val meta = com.google.firebase.storage.StorageMetadata.Builder()
-                .setContentType(contentType ?: if (mediaType == MediaType.VIDEO) "video/mp4" else "image/jpeg")
-                .build()
-            val task = file.putFile(media, meta)
-            task.addOnProgressListener { s -> onProgress(s.bytesTransferred.toFloat() / maxOf(1L, s.totalByteCount)) }
-            task.await()
-            url = file.downloadUrl.await().toString()
-        }
-        val data = buildMap<String, Any> {
-            put("from", "owner")
-            put("text", text)
-            put("at", FieldValue.serverTimestamp())
-            if (url != null && mediaType != null) {
-                put("mediaUrl", url)
-                put("mediaType", if (mediaType == MediaType.VIDEO) "video" else "image")
+            onProgress(0.05f)
+            val bytes = withContext(Dispatchers.IO) {
+                Supa.appContext.contentResolver.openInputStream(media)?.use { it.readBytes() }
+            } ?: error("Couldn't read that file")
+            val isVideo = mediaType == MediaType.VIDEO
+            val path = "${b.id}/${UUID.randomUUID()}.${if (isVideo) "mp4" else "jpg"}"
+            val bucket = supabase.storage.from("chats")
+            bucket.upload(path, bytes) {
+                upsert = false
+                this.contentType = ContentType.parse(contentType ?: if (isVideo) "video/mp4" else "image/jpeg")
             }
+            onProgress(1f)
+            url = bucket.publicUrl(path)
         }
-        val preview = text.ifBlank { if (mediaType == MediaType.VIDEO) "Video" else "Photo" }
-        db.batch()
-            .set(msg, data)
-            .set(
-                chat, mapOf(
-                    "customerUid" to b.customerUid,
-                    "name" to b.name,
-                    "lastText" to preview,
-                    "lastFrom" to "owner",
-                    "lastAt" to FieldValue.serverTimestamp(),
-                    "customerUnread" to FieldValue.increment(1),
-                    "ownerUnread" to 0,
-                ), SetOptions.merge()
-            )
-            .commit().await()
+        supabase.from("messages").insert(buildJsonObject {
+            put("booking_id", b.id)
+            put("sender", "owner")
+            put("text", text)
+            if (url != null && mediaType != null) {
+                put("media_url", url)
+                put("media_type", if (mediaType == MediaType.VIDEO) "video" else "image")
+            }
+        })
     }
 
     // ---------------- Push notifications ----------------
 
-    /** Saves this phone's FCM token on owners/{uid} so Cloud Functions can notify it. */
+    /** Saves this phone's FCM token so the notify-owners function can reach it. */
     suspend fun registerPushToken(token: String? = null) {
-        val uid = auth.currentUser?.uid ?: return
+        val uid = supabase.auth.currentUserOrNull()?.id ?: return
         val t = token ?: FirebaseMessaging.getInstance().token.await()
-        runCatching { db.collection("owners").document(uid).update("fcmTokens", FieldValue.arrayUnion(t)).await() }
-    }
-
-    suspend fun unregisterPushToken() {
-        val uid = auth.currentUser?.uid ?: return
         runCatching {
-            val t = FirebaseMessaging.getInstance().token.await()
-            db.collection("owners").document(uid).update("fcmTokens", FieldValue.arrayRemove(t)).await()
+            supabase.from("push_tokens").upsert(buildJsonObject {
+                put("token", t)
+                put("user_id", uid)
+                put("platform", "android")
+            })
         }
     }
 
-    /** Writes the bundled default price list to config/main, only if none exists yet. */
+    suspend fun unregisterPushToken() {
+        runCatching {
+            val t = FirebaseMessaging.getInstance().token.await()
+            supabase.from("push_tokens").delete { filter { eq("token", t) } }
+        }
+    }
+
+    /** Writes the bundled default price list to config 'main', only if none exists yet. */
     suspend fun publishDefaultPriceList(context: Context): Boolean {
-        val doc = db.collection("config").document("main")
-        if (doc.get().await().exists()) return false
+        val existing = supabase.from("config").select { filter { eq("id", "main") } }.decodeList<JsonObject>()
+        if (existing.isNotEmpty()) return false
         val json = context.assets.open("default-config.json").bufferedReader().use { it.readText() }
-        doc.set(JSONObject(json).toMap()).await()
+        val data = kotlinx.serialization.json.Json.parseToJsonElement(json)
+        supabase.from("config").insert(buildJsonObject {
+            put("id", "main")
+            put("data", data)
+        })
         return true
     }
-}
-
-private fun JSONObject.toMap(): Map<String, Any?> = keys().asSequence().associateWith { k -> unwrap(get(k)) }
-private fun JSONArray.toList(): List<Any?> = (0 until length()).map { unwrap(get(it)) }
-private fun unwrap(v: Any?): Any? = when (v) {
-    is JSONObject -> v.toMap()
-    is JSONArray -> v.toList()
-    JSONObject.NULL -> null
-    else -> v
 }
