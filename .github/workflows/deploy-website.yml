@@ -1,37 +1,58 @@
 name: Deploy website
 
-# Publishes website/ to Firebase Hosting (and tideandteanails.in once the domain is connected)
-# whenever website files change on main. Needs two repository secrets:
-#   FIREBASE_SERVICE_ACCOUNT  - JSON key of a Firebase service account (see SETUP.md)
-#   FIREBASE_PROJECT_ID       - your Firebase project id
+# Builds the website from Supabase content and publishes it to Firebase Hosting (tideandteanails.in).
+# The database and edge functions deploy separately, in deploy-supabase.yml.
+#
+# Runs when:
+#   - code changes land on main
+#   - the owner taps "Publish website" in the app (repository_dispatch: publish-site)
+#   - every night at 00:30 IST, so sale start and end dates show correctly on the static pages
+#   - by hand from the Actions tab
+#
+# Repository secrets (Settings > Secrets and variables > Actions). Missing ones are skipped with a note:
+#   FIREBASE_SERVICE_ACCOUNT   JSON key of a service account with the "Firebase Hosting Admin" role
+#   FIREBASE_PROJECT_ID        Firebase project id (hosting only)
+# The site reads Supabase with the public URL and anon key in website/public/config.js.
 on:
   push:
     branches: [main]
-    paths: ["website/**"]
+    paths: ["website/**", "supabase/functions/_shared/pricing.mjs", ".github/workflows/deploy-website.yml"]
+  repository_dispatch:
+    types: [publish-site]
+  schedule:
+    - cron: "0 19 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: deploy-website
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HAS_FIREBASE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' && secrets.FIREBASE_PROJECT_ID != '' }}
     steps:
-      - name: Check secrets
-        id: check
-        env:
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          if [ -z "$SA" ]; then
-            echo "FIREBASE_SERVICE_ACCOUNT is not set yet, skipping deploy. See SETUP.md."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
       - uses: actions/checkout@v4
-        if: steps.check.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test pricing and site build
+        run: cd website/site && npm test
+
+      # ---------------- Website ----------------
+      - name: Build website
+        run: node website/site/build.mjs
       - uses: FirebaseExtended/action-hosting-deploy@v0
-        if: steps.check.outputs.ready == 'true'
+        if: env.HAS_FIREBASE == 'true'
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
           entryPoint: website
           channelId: live
+      - name: Hosting not configured
+        if: env.HAS_FIREBASE != 'true'
+        run: echo "::notice::FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID is not set. Built the site but did not publish it."

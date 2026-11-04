@@ -5,3 +5,7 @@ project_id = "tide-and-tea-nails"
 # Called by the database (pg_net) with a shared secret, not by signed-in users.
 [functions.notify-owners]
 verify_jwt = false
+
+# Called by Razorpay servers; the function checks the webhook signature itself.
+[functions.razorpay-webhook]
+verify_jwt = false

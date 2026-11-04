@@ -1,0 +1,83 @@
+{
+  "brand": {
+    "name": "Tide & Tea Nails",
+    "tagline": "Luxury nail extensions and custom press-ons in Chennai"
+  },
+  "contact": {
+    "phone": "",
+    "whatsapp": "",
+    "email": "",
+    "instagram": "",
+    "address": "",
+    "area": "",
+    "city": "Chennai",
+    "pincode": "",
+    "homeVisitsOnly": true,
+    "hours": [
+      { "days": "Tuesday to Sunday", "time": "10:00 am to 8:00 pm" },
+      { "days": "Monday", "time": "Closed" }
+    ],
+    "googleProfileUrl": "",
+    "googleReviewUrl": ""
+  },
+  "home": {
+    "eyebrow": "Nail extensions · home visits · press-ons",
+    "title": "Nails that turn heads *with the tide*",
+    "text": "Gel-X, acrylic, PolyGel and BIAB sets done at your home across Chennai, plus reusable custom press-ons shipped anywhere in India.",
+    "heroImage": "",
+    "offerText": ""
+  },
+  "about": {
+    "title": "Hi, we're Tide & Tea",
+    "body": "Tide & Tea Nails is a Chennai nail studio that comes to you. Every set starts with your inspo and a look at your natural nails, so we can suggest the extension that will last best on you.\n\nWe sterilise our metal tools between every client and use a fresh file and buffer for each set.\n\n*Edit this story in the owner app under Website, then About us.*",
+    "images": []
+  },
+  "follow": {
+    "enabled": true,
+    "message": "Follow us for new sets, offers and press-on drops",
+    "coupon": "",
+    "couponNote": "",
+    "seconds": 3
+  },
+  "sale": {
+    "enabled": false,
+    "percent": 20,
+    "label": "Festive sale",
+    "startsAt": "",
+    "endsAt": ""
+  },
+  "shipping": {
+    "flat": 80,
+    "freeAbove": 999,
+    "days": "Ships in 2 to 4 days, delivered in 3 to 6 days across India",
+    "cod": false
+  },
+  "areas": [
+    { "name": "Anna Nagar", "text": "Home-visit nail extensions in Anna Nagar, from the Tower Park side to Shanthi Colony and Anna Nagar West. Book a Gel-X, acrylic or BIAB set and we bring the full kit to your door." },
+    { "name": "Adyar", "text": "Nail extensions at home in Adyar, Besant Nagar and Thiruvanmiyur. Pick your slot online, share your inspo, and we confirm the best extension for your nails before we arrive." },
+    { "name": "Velachery", "text": "Gel and acrylic nail extensions at home in Velachery, close to Phoenix Marketcity and the MRTS line. Ideal for a weekend set or a quick refill before an event." },
+    { "name": "T. Nagar", "text": "Nail art and extensions at home in T. Nagar, around Pondy Bazaar and Usman Road. Skip the salon queue and get your wedding or festive set done in your own space." },
+    { "name": "Nungambakkam", "text": "Home-visit nail extensions in Nungambakkam and around Khader Nawaz Khan Road. Clean, sterilised tools and a calm appointment at home." },
+    { "name": "OMR", "text": "Nail extensions at home along OMR, from Thoraipakkam to Sholinganallur. Evening and weekend slots that work around office hours." }
+  ],
+  "faq": [
+    { "q": "How long do gel nail extensions last?", "a": "Soft gel (Gel-X) and acrylic sets usually last 3 to 4 weeks, depending on your nail growth and how you use your hands. We recommend a refill or a fresh set after that." },
+    { "q": "Do you come to my home?", "a": "Yes. We do home visits across Chennai. The travel charge depends on the distance and is shown before you send your request." },
+    { "q": "Which extension is best for my nails?", "a": "Upload a photo of your natural nails when you book. We look at it with your inspo and suggest the extension that will hold up best on you." },
+    { "q": "How do press-on nails fit?", "a": "Each set comes in sizes, or made to your measurements for custom sets. Use the sizing guide on the shop page, or send us a photo and we'll size it for you." },
+    { "q": "How do I pay?", "a": "For appointments, a small advance by UPI confirms your slot after we approve your request. The balance is paid on the day. Press-on orders are paid online at checkout." }
+  ],
+  "sizing": "Measure the widest part of each nail with a soft tape, or press clear tape across the nail, mark the edges and measure it on a ruler.\n\n- **S**: thumb 15 mm, index 11 mm, middle 12 mm, ring 11 mm, little 8 mm\n- **M**: thumb 16 mm, index 12 mm, middle 13 mm, ring 12 mm, little 9 mm\n- **L**: thumb 17 mm, index 13 mm, middle 14 mm, ring 13 mm, little 10 mm\n\nBetween sizes? Pick the larger one and file the sides to fit. For a custom set, add your ten measurements in the order notes.",
+  "policies": {
+    "shipping": "Ready press-on sets ship within 2 to 4 working days. Made-to-order sets ship within 5 to 7 working days. Delivery across India usually takes 3 to 6 days after dispatch. You will get a tracking link when your order ships.",
+    "returns": "Press-ons are made to fit and can't be returned once opened, for hygiene reasons. If your order arrives damaged or wrong, message us within 48 hours with photos and an unboxing video and we will replace it or refund you.",
+    "cancellation": "Press-on orders can be cancelled for a full refund until they are shipped. Refunds go back to your original payment method within 5 to 7 working days.\n\nFor appointments, your advance is refundable if you cancel at least 24 hours before your slot. Later cancellations or no-shows forfeit the advance. We are happy to move your slot once at no charge.",
+    "privacy": "We collect your name, phone number, address and the photos you upload only to provide your appointment or deliver your order. Payments are handled by our payment partner; we never see or store your card details. We do not sell or share your details with anyone else. To have your data deleted, contact us.",
+    "terms": "Prices are in Indian rupees. Appointment prices are confirmed when we approve your request. Offers and coupon codes can't be combined unless stated, and may end without notice. By booking or ordering you agree to these terms and our policies."
+  },
+  "seo": {
+    "siteUrl": "https://tideandteanails.in",
+    "title": "Nail Extensions in Chennai at Home | Tide & Tea Nails",
+    "description": "Gel-X, acrylic, PolyGel and BIAB nail extensions at your home in Chennai, plus custom press-on nails shipped across India. Book online in two minutes."
+  }
+}

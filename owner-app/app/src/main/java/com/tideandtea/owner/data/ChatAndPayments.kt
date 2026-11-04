@@ -62,7 +62,7 @@ enum class PaymentKind(val key: String, val label: String) {
     }
 }
 
-/** public.payments: written by database triggers when a booking is confirmed or completed. */
+/** public.payments: written by database triggers when a booking is confirmed or completed, and when a shop order is paid. */
 data class Payment(
     val id: String,
     val bookingId: String,
@@ -72,6 +72,8 @@ data class Payment(
     val method: String,
     val reference: String,
     val atMillis: Long,
+    /** Set for press-on shop payments instead of bookingId. */
+    val orderId: String = "",
 ) {
     companion object {
         fun from(r: JsonObject) = Payment(
@@ -83,6 +85,7 @@ data class Payment(
             method = r.str("method"),
             reference = r.str("reference"),
             atMillis = r.millis("created_at"),
+            orderId = r.str("order_id"),
         )
     }
 }

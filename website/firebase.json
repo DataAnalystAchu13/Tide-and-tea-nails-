@@ -1,29 +1,27 @@
 {
   "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*"
+    "public": "dist",
+    "predeploy": ["node site/build.mjs"],
+    "ignore": ["firebase.json", "**/.*"],
+    "trailingSlash": true,
+    "redirects": [
+      { "source": "/instagram", "destination": "/hi/", "type": 302 },
+      { "source": "/ig", "destination": "/hi/", "type": 302 },
+      { "source": "/press-ons", "destination": "/shop/", "type": 301 },
+      { "source": "/booking", "destination": "/book/", "type": 301 }
     ],
     "headers": [
-      {
-        "source": "**/*.@(js|css)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=3600"
-          }
-        ]
-      },
-      {
-        "source": "**/*.@(png|webp|jpg)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=604800"
-          }
-        ]
-      }
+      { "source": "**", "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+      ] },
+      { "source": "**/*.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
+      { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "/shop-data.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=60" }] },
+      { "source": "**/*.@(js|mjs|css)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] },
+      { "source": "**/*.@(png|webp|jpg|svg)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
     ]
   }
 }

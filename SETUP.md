@@ -1,10 +1,10 @@
-# Tide & Tea Nails: booking website + owner app
+# Tide & Tea Nails: website, press-on shop and owner app
 
 Two parts share one **Supabase** project (database, logins, photo storage, live updates). Firebase is used only on its free plan, to host the website and to send push notifications to your phone.
 
 | Part | Who uses it | Folder |
 |---|---|---|
-| Booking website | Customers | `website/` (deploys to Firebase Hosting) |
+| Website: home, booking, press-on shop, blog, reviews, Chennai area pages | Customers | `website/` (built by `website/site/build.mjs`, deploys to Firebase Hosting) |
 | Database, security and push function | Both | `supabase/` (deploys to Supabase) |
 | Studio app (Android) | You, the owner | `owner-app/` (open in Android Studio) |
 
@@ -18,6 +18,23 @@ Two parts share one **Supabase** project (database, logins, photo storage, live 
 6. After the appointment, tap **Paid in cash** or **Paid by UPI** to record the balance and close the booking.
 
 Your phone gets a push notification for every new request, every advance a client says they've paid, and every chat message. Clients can chat with you from their booking on the website and send photos and short videos (up to 60 MB); you reply from the **Chats** tab. **Insights** shows money collected, requests, approval rate, average booking, a weekly chart and your most requested sets.
+
+## The website and the shop
+
+- **tideandteanails.in** is a fast, pre-built site: home, **Book** (the booking flow above), **Shop** (press-on sets), product pages, bag and checkout, **My orders**, About us, Reviews, Blog, Contact, policies and one page per Chennai area. Google gets structured data for your business, products, posts and FAQ, plus a sitemap.
+- Customers can add it to their home screen like an app (it works offline for pages they've opened).
+- **tideandteanails.in/hi** is the link to share on Instagram, WhatsApp or a QR code: visitors see a Follow on Instagram card once, then go straight to the site. Nobody can be made to follow automatically; the card makes it one tap.
+- **Press-on orders**: the customer picks a size, applies a coupon, enters their address and pays. With Razorpay keys set (step 7) they pay by UPI, card or netbanking and the order is confirmed automatically. Without them, they pay your UPI ID and enter the transaction ID, and you confirm it in the app. Stock goes down only when an order is paid.
+
+### What you edit in the studio app
+
+| Tab | What it's for |
+|---|---|
+| **Requests** | Booking requests: approve, confirm advances, mark done |
+| **Orders** | Press-on orders: confirm UPI payments, mark packed, add tracking and mark shipped, mark delivered. You get a notification for every paid order. |
+| **Chats** | Messages with booked clients |
+| **Website** | Products, sale and coupons, shipping, booking prices and slots, home page, About us, contact and hours, Instagram card, Chennai areas, FAQ, sizing guide, policies, Google search text, blog and reviews. Tap **Publish website** after editing; the site updates in about 2 minutes. Prices, slots and coupons apply right away without publishing. |
+| **Insights** | Money collected and booking stats. **Payments** (top right) lists every advance, balance and shop payment. |
 
 ## One-time setup (about 40 minutes, no card needed)
 
@@ -69,9 +86,14 @@ Without a key the site still works: customers tap **Use my current location** an
 3. Wait for Firebase to show **Connected** (usually under an hour, up to 24). SSL is set up automatically.
 4. Supabase → **Authentication → URL Configuration**: set Site URL to `https://tideandteanails.in`.
 
+### 7. Publish button and online payments
+1. **Publish button**: on GitHub, Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate. Repository access: only this repository. Permissions: **Contents: Read and write**. In Supabase → **Edge Functions → Secrets**, add `GH_DISPATCH_TOKEN` with that token, and `GH_REPO` with `DataAnalystAchu13/Tide-and-tea-nails-`. The website also rebuilds itself every night at 00:30 so sale dates switch on time.
+2. **Razorpay (optional, needs a Razorpay account with KYC)**: Razorpay dashboard → Account & Settings → **API Keys** → generate. Add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` as Supabase Edge Function secrets. Then Webhooks → Add: URL `https://<project-ref>.supabase.co/functions/v1/razorpay-webhook`, event **payment.captured** (and **order.paid**), with a secret you make up, which you also save as `RAZORPAY_WEBHOOK_SECRET`. Until these are set, checkout uses the UPI + transaction ID flow.
+3. Set your UPI ID in the app (Website → Services and prices → Payment) before going live. Shop orders use the same UPI ID.
+
 ## Changing prices, slots, studio location and UPI ID
 
-Everything customers see lives in one database row: Supabase → **Table Editor → `config` → `main` → `data`**. Edit the JSON there and the website updates instantly, no redeploy needed.
+Change these in the app: **Website → Services and prices** and **Website → Days and slots**. They are saved in one database row (Supabase → **Table Editor → `config` → `main` → `data`**), so you can also edit the JSON there. The booking page picks up changes right away, no publish needed. The studio location (`studio.lat`, `studio.lng`) is only editable in Supabase.
 
 | Field | What it controls |
 |---|---|
@@ -82,7 +104,7 @@ Everything customers see lives in one database row: Supabase → **Table Editor 
 | `advancePercent` | Advance asked after approval |
 | `upiId`, `upiName` | Where advance payments go. **Change before going live.** |
 
-All starter prices are placeholders I made up. Replace them with your real prices.
+All starter prices, area texts and policies are placeholders. Replace them with your own before launch.
 
 ## Good to know
 - Customers' bookings are tied to the browser they booked from. If they switch phones, they can still reach you on WhatsApp; you see everything in the app.
