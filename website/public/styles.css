@@ -364,7 +364,7 @@ body.sheet-open { overflow: hidden; }
 .narrow { max-width: 760px; }
 .ico { width: 20px; height: 20px; fill: none; color: currentColor; }
 
-.offer { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--pink); color: var(--plum); font-weight: 800; font-size: .92rem; padding: 8px 16px; text-align: center; }
+.offer { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--pink); color: var(--royal); border-bottom: 1px solid var(--line); font-weight: 800; font-size: .92rem; padding: 8px 16px; text-align: center; }
 .offer a { text-decoration: none; }
 .offer svg { width: 12px; height: 12px; fill: var(--royal); flex: none; }
 
@@ -747,8 +747,11 @@ details.extra[open] { padding-bottom: 4px; }
    buttons, a blush-tinted page and borderless soft cards.
    ===================================================================== */
 :root {
-  --mist: #fbf3f6;
-  --line: #eedbe5;
+  /* White and purple: white page, white accents on purple, purple accents on white. */
+  --mist: #ffffff;
+  --line: #ebe3f2;
+  --pink: #ffffff;
+  --pink-deep: #5b2d8a;
   --script: "Allura", "Snell Roundhand", cursive;
   --shadow: 0 1px 2px rgba(58, 29, 92, .04), 0 18px 40px -24px rgba(58, 29, 92, .32);
 }
@@ -782,4 +785,18 @@ h3 { letter-spacing: .01em; }
 @media (max-width: 760px) {
   .pay-row { display: grid; gap: 10px; width: 100%; }
   .pay-row .btn { width: 100%; min-height: 50px; }
+}
+
+/* With white accents, keep the light chips and buttons readable */
+.btn-pink { color: var(--royal); }
+.btn-pink:hover { background: #f1eaf8; }
+.badge.sale, .cart-count { background: var(--royal); color: #fff; }
+.site-head .cart-count { background: #fff; color: var(--royal); }
+.date input:checked + span small, .chip input:checked + span i { color: #fff; }
+.stepper li.done::before { background: var(--royal-2); }
+.mybk.hl { box-shadow: 0 0 0 3px var(--royal-2), var(--shadow); }
+.section:nth-of-type(even) .card, .faq details { box-shadow: 0 1px 2px rgba(58,29,92,.05), 0 0 0 1px var(--line), 0 18px 40px -26px rgba(58,29,92,.3); }
+@media (max-width: 760px) {
+  .brand { min-width: 0; font-size: .95rem; letter-spacing: .03em; }
+  .brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }

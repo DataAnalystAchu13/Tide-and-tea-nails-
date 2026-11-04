@@ -49,6 +49,21 @@ export function deepMerge(base, over) {
   return out;
 }
 
+/** Empty text fields in the app mean "use the default wording", so fill them back in. */
+export function fillBlanks(base, over) {
+  if (typeof base === "string") return typeof over === "string" && over.trim() ? over : base;
+  if (Array.isArray(base)) {
+    const rows = Array.isArray(over) ? over.filter((r) => r && Object.values(r).some((v) => String(v ?? "").trim())) : [];
+    return rows.length ? rows : base;
+  }
+  if (isObj(base)) {
+    const out = { ...(isObj(over) ? over : {}) };
+    for (const k of Object.keys(base)) out[k] = fillBlanks(base[k], isObj(over) ? over[k] : undefined);
+    return out;
+  }
+  return over ?? base;
+}
+
 const byOrder = (a, b) => (Number(a.order) || 999) - (Number(b.order) || 999) || String(a.name || "").localeCompare(String(b.name || ""));
 
 /** Gives every product, post and area a unique, stable URL slug. */
@@ -92,6 +107,7 @@ export async function loadContent() {
   config = mergeConfig(config || DEFAULT_CONFIG);
 
   const time = (x) => Date.parse(x.publishedAt || x.createdAt || 0) || 0;
+  site.texts = fillBlanks(defaults.texts, site.texts);
   return {
     settings,
     demo,
