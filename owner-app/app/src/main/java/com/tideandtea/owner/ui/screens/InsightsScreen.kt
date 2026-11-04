@@ -1,5 +1,6 @@
 package com.tideandtea.owner.ui.screens
 
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
