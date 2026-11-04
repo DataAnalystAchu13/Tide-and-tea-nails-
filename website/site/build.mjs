@@ -54,7 +54,10 @@ export async function build({ quiet = false } = {}) {
     { ...R.notFound(c), noindex: true },
     { ...R.offline(c), noindex: true },
   ];
-  for (const p of pages) await put(p.path, p.html);
+  // Version our own CSS and JS links so a new build is never shown with an old stylesheet.
+  const v = String(now);
+  const bust = (html) => html.replace(/(href|src)="(\/[\w.-]+\.(?:css|js))"/g, `$1="$2?v=${v}"`);
+  for (const p of pages) await put(p.path, bust(p.html));
   await put("/sitemap.xml", R.sitemap(c, pages));
   await put("/robots.txt", R.robots(c));
   // New cache name on every build so phones pick up the new pages and styles.
