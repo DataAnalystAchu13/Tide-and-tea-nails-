@@ -81,7 +81,7 @@ private fun compute(bookings: List<Booking>, payments: List<Payment>, period: Pe
     }
     val pays = payments.filter { it.atMillis > 0 && inPeriod(it.atMillis.toDate()) }
     val reqs = bookings.filter { it.createdAtMillis > 0 && inPeriod(it.createdAtMillis.toDate()) }
-    val decided = reqs.filter { it.status != BookingStatus.REQUESTED }
+    val decided = reqs.filter { it.status != BookingStatus.REQUESTED && it.status != BookingStatus.CANCELLED }
     val accepted = decided.count { it.status != BookingStatus.DECLINED }
     val won = reqs.filter { it.status == BookingStatus.CONFIRMED || it.status == BookingStatus.COMPLETED }
 

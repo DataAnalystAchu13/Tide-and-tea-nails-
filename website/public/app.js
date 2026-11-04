@@ -53,6 +53,7 @@ async function supabaseBackend() {
     instagram: r.instagram, notes: r.notes, extension: r.extension, length: r.length, shape: r.shape, addOns: r.add_ons,
     date: r.date, slot: r.slot, serviceMode: r.service_mode, location: r.location, distanceKm: Number(r.distance_km),
     inspoUrls: r.inspo_urls, naturalUrls: r.natural_urls, price: r.price, ownerNote: r.owner_note, paymentRef: r.payment_ref,
+    refundDue: !!r.refund_due, cancelledAt: r.cancelled_at ? Date.parse(r.cancelled_at) : null,
     createdAt: Date.parse(r.created_at),
   });
 
@@ -102,6 +103,9 @@ async function supabaseBackend() {
     async submitPayment(id, ref) {
       must(await sb.rpc("submit_payment", { p_booking_id: id, p_ref: ref }));
     },
+    async cancelBooking(id) {
+      return must(await sb.rpc("cancel_booking", { p_booking_id: id }));
+    },
   };
 }
 
@@ -130,6 +134,13 @@ function previewBackend() {
     },
     async create(id, data) { write([{ ...data, id, status: "requested", createdAt: Date.now() }, ...read()]); },
     async submitPayment(id, ref) { patch(id, { status: "payment_submitted", paymentRef: ref }); },
+    async cancelBooking(id) {
+      const b = read().find((x) => x.id === id); if (!b) throw new Error("Booking not found");
+      const paid = ["payment_submitted", "confirmed"].includes(b.status);
+      const refund = paid && hoursUntil(b) >= 24;
+      patch(id, { status: "cancelled", refundDue: refund, cancelledAt: Date.now() });
+      return { paid, refund, amount: b.price?.advance || 0 };
+    },
     // Preview-only helper so the owner can see the customer's payment step.
     demoApprove(id) {
       const b = read().find((x) => x.id === id); if (!b) return;
@@ -732,6 +743,7 @@ async function submit() {
 }
 
 function showSuccess(sent, id) {
+  successBooking = { id, status: "requested", date: sent.date, slot: sent.slot, price: sent.q };
   $("#stepper").innerHTML = "";
   $("#stepBody").innerHTML = `
   <div class="success">
@@ -740,6 +752,7 @@ function showSuccess(sent, id) {
     <p>Thank you, ${esc(sent.name)}. Pay the advance now to hold ${esc(prettyDate(sent.date))} at ${esc(slotLabel(sent.slot))} for you. We'll check your inspo and confirm on WhatsApp.</p>
     ${payBlock({ id, status: "requested", price: sent.q })}
     <a class="btn btn-quiet" href="#mine">See my bookings</a>
+    ${cancelBtn({ id, status: "requested", date: sent.date, slot: sent.slot })}
   </div>`;
   $(".step-foot").hidden = true;
   drawQrs();
@@ -757,7 +770,49 @@ const STATUS = {
   confirmed: "Confirmed",
   completed: "Done",
   declined: "Not available",
+  cancelled: "Cancelled",
 };
+
+/** Hours from now until the appointment starts (slots are India time). */
+function hoursUntil(b) {
+  const t = Date.parse(`${b.date}T${String(b.slot || "00:00").slice(0, 5)}:00+05:30`);
+  return (t - Date.now()) / 3600000;
+}
+const CANCELLABLE = ["requested", "approved", "payment_submitted", "confirmed"];
+function cancelBtn(b) {
+  if (!CANCELLABLE.includes(b.status || "requested") || hoursUntil(b) <= 0) return "";
+  return `<div class="pay-row cancel-row"><button type="button" class="linkbtn cancel-link" data-cancel="${esc(b.id)}">Cancel this booking</button></div>`;
+}
+
+async function cancelBooking(btn) {
+  const id = btn.dataset.cancel;
+  const b = myBookings.find((x) => x.id === id) || successBooking;
+  if (!b) return;
+  const st = b.status || "requested";
+  const paid = st === "payment_submitted" || st === "confirmed";
+  const adv = money(b.price?.advance);
+  const msg = !paid
+    ? "Cancel this booking? You haven't paid anything, so nothing is charged."
+    : hoursUntil(b) >= 24
+      ? `Cancel this booking? You're more than 24 hours before your slot, so your ${adv} advance will be refunded to your UPI account.`
+      : `Cancel this booking? It's less than 24 hours before your slot, so the ${adv} advance can't be refunded (see our cancellation policy).`;
+  if (!window.confirm(msg)) return;
+  btn.disabled = true;
+  try {
+    const r = (await backend.cancelBooking(id)) || {};
+    toast(r.refund ? `Booking cancelled. We'll refund ${adv} to you soon.` : "Booking cancelled. Your slot is free for someone else.");
+    const succ = btn.closest(".success");
+    if (succ) {
+      succ.querySelector(".pay")?.remove();
+      btn.closest(".cancel-row").outerHTML = `<div class="note">This booking is cancelled.</div>`;
+      successBooking = null;
+    }
+  } catch (err) {
+    console.error(err);
+    toast("Couldn't cancel. Message us on WhatsApp and we'll sort it out.");
+    btn.disabled = false;
+  }
+}
 
 function upiLink(b) {
   const p = new URLSearchParams({ pa: cfg.upiId, pn: cfg.upiName, am: String(b.price.advance), cu: "INR", tn: `Tide and Tea advance ${b.id.slice(-6)}` });
@@ -765,6 +820,7 @@ function upiLink(b) {
 }
 
 let myBookings = [];
+let successBooking = null;
 /** WhatsApp link to the studio about one booking, or "" when no number is set. */
 function waLink(b) {
   let n = String(cfg.whatsapp || document.getElementById("book")?.dataset.wa || "").replace(/\D/g, "");
@@ -814,6 +870,7 @@ async function sendPaid(btn) {
   try {
     await backend.submitPayment(box.dataset.pay, ref);
     toast("Thanks! Your slot is held. We'll confirm on WhatsApp shortly.");
+    if (successBooking && successBooking.id === box.dataset.pay) successBooking.status = "payment_submitted";
     const succ = btn.closest(".success");
     if (succ) succ.querySelector(".pay").outerHTML = `<div class="note">Payment reference <b>${esc(ref)}</b> received. Your slot is held, and we'll confirm on WhatsApp shortly.</div>`;
   } catch (err) { console.error(err); toast("Couldn't save that. Try again."); btn.disabled = false; }
@@ -835,8 +892,10 @@ function renderMine(list) {
       action = `<div class="note">You're booked! ${b.serviceMode === "home" ? "We'll arrive at your address" : "See you at the studio"} at ${esc(b.slot)}.</div>`;
     } else if (st === "declined") {
       action = `<div class="note">${esc(b.ownerNote || "This slot didn't work out. Please try another date.")}</div>`;
+    } else if (st === "cancelled") {
+      action = `<div class="note">You cancelled this booking.${b.refundDue ? ` Your ${money(price.advance)} advance will be refunded to your UPI account.` : ""}</div>`;
     }
-    const note = b.ownerNote && st !== "declined" ? `<div class="note"><b>From Tide & Tea:</b> ${esc(b.ownerNote)}</div>` : "";
+    const note = b.ownerNote && st !== "declined" && st !== "cancelled" ? `<div class="note"><b>From Tide & Tea:</b> ${esc(b.ownerNote)}</div>` : "";
     const wa = waLink(b);
     const chatBtn = wa ? `<div class="pay-row"><a class="btn btn-quiet btn-sm" href="${esc(wa)}" target="_blank" rel="noopener">Message us on WhatsApp</a></div>` : "";
     const demo = "";
@@ -844,7 +903,7 @@ function renderMine(list) {
     <article class="card mybk">
       <div class="mybk-top"><h3>${esc(b.extension?.name || "Nail set")}${b.length ? ` · ${esc(b.length.name)}` : ""}</h3><span class="pill st-${esc(st)}">${esc(STATUS[st] || st)}</span></div>
       <div class="meta"><span>${esc(prettyDate(b.date))} at ${esc(b.slot)}</span><span>${b.serviceMode === "home" ? "Home visit" : "Studio visit"}</span><span>Total ${money(price.total)}</span></div>
-      ${note}${action}${chatBtn}${demo}
+      ${note}${action}${chatBtn}${cancelBtn(b)}${demo}
     </article>`;
   }).join("");
   drawQrs();
@@ -901,6 +960,8 @@ function bind() {
   document.addEventListener("click", async (e) => {
     const paid = e.target.closest("[data-paid]");
     if (paid) { e.preventDefault(); sendPaid(paid); return; }
+    const cx = e.target.closest("[data-cancel]");
+    if (cx) { e.preventDefault(); cancelBooking(cx); return; }
     const c = e.target.closest("[data-copy]");
     if (c) { try { await navigator.clipboard.writeText(c.dataset.copy); toast("UPI ID copied"); } catch { toast(c.dataset.copy); } }
     const d = e.target.closest("[data-demo-approve]");

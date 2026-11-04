@@ -118,6 +118,11 @@ class OwnerRepository(private val supabase: SupabaseClient = Supa.client) {
         })
     }
 
+    /** Marks the advance of a client-cancelled booking as refunded. */
+    suspend fun markRefunded(b: Booking) {
+        update(b, buildJsonObject { put("refund_due", false) })
+    }
+
     /** Confirms the advance. The database records it in payment history. */
     suspend fun confirmPayment(b: Booking, total: Int = b.price.total, note: String = "") {
         update(b, buildJsonObject {
