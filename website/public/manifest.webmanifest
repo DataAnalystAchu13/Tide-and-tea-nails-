@@ -1,0 +1,22 @@
+{
+  "name": "Tide & Tea Nails",
+  "short_name": "Tide & Tea",
+  "description": "Book nail extensions at home in Chennai and shop custom press-ons.",
+  "start_url": "/?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f2fb",
+  "theme_color": "#3a1d5c",
+  "lang": "en-IN",
+  "categories": ["beauty", "lifestyle", "shopping"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Book a set", "url": "/book/", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Shop press-ons", "url": "/shop/", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "My orders", "url": "/orders/", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

@@ -825,7 +825,7 @@ function renderPrices() {
       <h3 style="margin-top:18px">Add-ons</h3><ul class="plist">${cfg.addOns.map((a) => li(a.name, "+" + money(a.price))).join("")}</ul></div>
     <div class="card price-card"><h3>Home visit travel</h3><ul class="plist">${travel}</ul>
       <p class="muted" style="margin:12px 0 0">Advance of ${cfg.advancePercent}% after approval confirms your slot. The balance is paid on the day.</p></div>`;
-  $("#footStudio").textContent = cfg.studio.address;
+  const fs = $("#footStudio"); if (fs) fs.textContent = cfg.studio.address;
 }
 
 /* ------------------------------------------------------------------ */

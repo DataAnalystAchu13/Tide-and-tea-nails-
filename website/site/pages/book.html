@@ -1,0 +1,73 @@
+  <section class="steps-strip" aria-label="How booking works">
+    <ol class="how">
+      <li><b>Request</b><span>Pick your set, slot and location, add inspo pics.</span></li>
+      <li><b>We review</b><span>We check your inspo and nails, then approve.</span></li>
+      <li><b>Pay advance</b><span>A small advance locks your slot.</span></li>
+      <li><b>Nail day</b><span>We arrive with everything. You relax.</span></li>
+    </ol>
+  </section>
+
+  <section id="mine" class="section" hidden>
+    <div class="wrap">
+      <h2>My bookings</h2>
+      <div id="myBookings" class="my-list"></div>
+    </div>
+  </section>
+
+  <section id="book" class="section book-section">
+    <div class="wrap">
+      <div class="book-head">
+        <div>
+          <h2>Book your set</h2>
+          <p class="muted">Takes about two minutes. Nothing is charged until we approve your request.</p>
+        </div>
+        <svg class="bunny bunny-peek" aria-hidden="true"><use href="#bunny"/></svg>
+      </div>
+      <div class="booker card">
+        <ol class="stepper" id="stepper" aria-label="Booking steps"></ol>
+        <form id="stepForm" novalidate>
+          <div id="stepBody" class="step-body"></div>
+          <div class="step-foot">
+            <button type="button" class="btn btn-quiet" id="backBtn">Back</button>
+            <div class="running" aria-live="polite"><span class="muted">Estimate</span> <b id="runningTotal">₹0</b></div>
+            <button type="submit" class="btn btn-primary" id="nextBtn">Next</button>
+          </div>
+          <p class="form-error" id="formError" role="alert" hidden></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="prices" class="section prices-section">
+    <div class="wrap">
+      <h2>Price list</h2>
+      <p class="muted">Final price is confirmed when we approve your request, after we see your inspo and nails.</p>
+      <div id="priceList" class="price-grid"></div>
+    </div>
+  </section>
+
+<div id="overlay" class="overlay" hidden>
+  <div class="overlay-card">
+    <svg class="bunny bunny-hop" aria-hidden="true"><use href="#bunny"/></svg>
+    <p id="overlayText">Sending your request…</p>
+    <div class="bar"><span id="overlayBar"></span></div>
+  </div>
+</div>
+
+<div id="chatSheet" class="sheet" hidden>
+  <section class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="chatHeading">
+    <header class="sheet-head">
+      <img src="/logo.webp" alt="" width="40" height="40">
+      <div><h3 id="chatHeading">Tide &amp; Tea</h3><span class="muted" id="chatTitle"></span></div>
+      <button type="button" class="icon-x" id="chatClose" aria-label="Close chat">×</button>
+    </header>
+    <div class="chat-list" id="chatList" aria-live="polite"></div>
+    <div class="bar chat-bar" id="chatBar" hidden><span></span></div>
+    <div class="chat-preview" id="chatPreview" hidden></div>
+    <form class="chat-form" id="chatForm">
+      <label class="attach" title="Add a photo or video"><input type="file" id="chatFile" accept="image/*,video/*"><span aria-hidden="true">+</span><span class="sr">Add a photo or video</span></label>
+      <input id="chatText" placeholder="Message" autocomplete="off" maxlength="2000" aria-label="Message">
+      <button class="btn btn-primary btn-sm" id="chatSend">Send</button>
+    </form>
+  </section>
+</div>

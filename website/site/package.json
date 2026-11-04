@@ -1,0 +1,11 @@
+{
+  "name": "tide-and-tea-site",
+  "private": true,
+  "type": "module",
+  "description": "Static site generator for tideandteanails.in. No dependencies.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test site.test.mjs ../../supabase/functions/_shared/pricing.test.mjs"
+  }
+}
