@@ -5,8 +5,8 @@
   "start_url": "/?source=app",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f7f2fb",
-  "theme_color": "#3a1d5c",
+  "background_color": "#faf8fc",
+  "theme_color": "#cad3eb",
   "lang": "en-IN",
   "categories": ["beauty", "lifestyle", "shopping"],
   "icons": [
