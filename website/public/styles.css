@@ -1022,3 +1022,14 @@ h2 { color: var(--ink); }
 /* Contact: map card matches the cards beside it instead of towering over them */
 @media (min-width: 761px) { .mapframe { align-self: start; min-height: 0; } .mapframe iframe { min-height: 300px; } }
 .site-foot .copy { color: var(--muted); }
+
+/* How booking works: one compact card on phones instead of four big tiles */
+@media (max-width: 600px) {
+  .how { grid-template-columns: 1fr; gap: 0; padding: 4px 16px; margin: 0 16px; background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); }
+  .how li { display: grid; grid-template-columns: 26px 1fr; column-gap: 12px; row-gap: 0; align-items: baseline;
+    padding: 12px 0; background: none; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--line); }
+  .how li:last-child { border-bottom: 0; }
+  .how li::before { grid-row: 1 / span 2; width: 26px; height: 26px; font-size: .78rem; align-self: start; }
+  .how b { font-size: .98rem; }
+  .how span { font-size: .86rem; line-height: 1.4; }
+}
