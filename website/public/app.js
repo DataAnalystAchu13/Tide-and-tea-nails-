@@ -915,6 +915,13 @@ function bind() {
 async function boot() {
   $("#previewBanner").hidden = !PREVIEW;
   loadDraft();
+  // Arriving from a "book this set" link (e.g. the shop's Custom press-on card): pick that set and start at step 1.
+  const want = new URLSearchParams(location.search).get("set");
+  if (want) {
+    const t = cfg.extensionTypes.find((x) => x.id === want);
+    if (t) { draft.extension = t; step = 0; saveDraft(); }
+    history.replaceState(null, "", location.pathname + location.hash);
+  }
   bind();
   renderPrices();
   renderStep();
