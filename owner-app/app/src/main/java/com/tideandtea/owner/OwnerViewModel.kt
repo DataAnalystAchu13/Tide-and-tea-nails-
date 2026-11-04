@@ -9,16 +9,11 @@ import androidx.lifecycle.viewModelScope
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.exceptions.HttpRequestException
-import android.net.Uri
 import com.tideandtea.owner.data.Booking
-import com.tideandtea.owner.data.ChatMessage
-import com.tideandtea.owner.data.ChatSummary
-import com.tideandtea.owner.data.MediaType
 import com.tideandtea.owner.data.Payment
 import com.tideandtea.owner.data.NotOwnerException
 import com.tideandtea.owner.data.OwnerRepository
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,16 +39,10 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
     val bookings: StateFlow<List<Booking>?> = _bookings.asStateFlow()
     private val _payments = MutableStateFlow<List<Payment>?>(null)
     val payments: StateFlow<List<Payment>?> = _payments.asStateFlow()
-    private val _chats = MutableStateFlow<List<ChatSummary>>(emptyList())
-    val chats: StateFlow<List<ChatSummary>> = _chats.asStateFlow()
     private val listenJobs = mutableListOf<Job>()
 
-    /** Set when the app is opened from a notification: "booking:<id>" or "chat:<id>". */
+    /** Set when the app is opened from a notification: "booking:<id>" or "order:<id>". */
     var pendingOpen by mutableStateOf<String?>(null)
-
-    /** Upload progress of a chat photo or video, 0..1, or null when idle. */
-    var sendProgress by mutableStateOf<Float?>(null)
-        private set
 
     init {
         viewModelScope.launch {
@@ -72,30 +61,7 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
         listenJobs += viewModelScope.launch {
             repo.payments().catch { _payments.value = emptyList() }.collect { _payments.value = it }
         }
-        listenJobs += viewModelScope.launch {
-            repo.chats().catch { }.collect { _chats.value = it }
-        }
         viewModelScope.launch { runCatching { repo.registerPushToken() } }
-    }
-
-    fun messages(bookingId: String): Flow<List<ChatMessage>> = repo.messages(bookingId).catch { emit(emptyList()) }
-
-    fun markChatRead(bookingId: String) = viewModelScope.launch { repo.markChatRead(bookingId) }
-
-    fun send(b: Booking, text: String, media: Uri?, type: MediaType?, mime: String?, onSent: () -> Unit) {
-        if (sendProgress != null) return
-        if (text.isBlank() && media == null) return
-        viewModelScope.launch {
-            sendProgress = 0f
-            try {
-                repo.sendMessage(b, text.trim(), media, type, mime) { sendProgress = it }
-                onSent()
-            } catch (e: Exception) {
-                message = "Message not sent: ${e.message ?: "unknown error"}"
-            } finally {
-                sendProgress = null
-            }
-        }
     }
 
     fun signIn(email: String, password: String) {
@@ -133,7 +99,6 @@ class OwnerViewModel(app: Application) : AndroidViewModel(app) {
             listenJobs.clear()
             _bookings.value = null
             _payments.value = null
-            _chats.value = emptyList()
             repo.signOut()
             authState = AuthState.SignedOut
         }

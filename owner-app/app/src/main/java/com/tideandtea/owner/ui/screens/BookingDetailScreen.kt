@@ -31,7 +31,6 @@ import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Directions
-import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -93,7 +92,6 @@ fun BookingDetailScreen(
     vm: OwnerViewModel,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
-    onChat: () -> Unit,
 ) {
     val ctx = LocalContext.current
     var viewer by remember { mutableStateOf<Pair<List<String>, Int>?>(null) }
@@ -138,9 +136,6 @@ fun BookingDetailScreen(
                         OutlinedButton(onClick = { ctx.open(b.whatsappUrl) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Outlined.Chat, null, Modifier.size(18.dp)); Text("  WhatsApp")
                         }
-                    }
-                    Button(onClick = onChat, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Pink, contentColor = Plum)) {
-                        Icon(Icons.Outlined.Forum, null, Modifier.size(18.dp)); Text("  Message in app")
                     }
                 }
             }
