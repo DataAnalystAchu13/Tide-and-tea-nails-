@@ -115,7 +115,7 @@ private fun compute(bookings: List<Booking>, payments: List<Payment>, period: Pe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InsightsScreen(bookings: List<Booking>?, payments: List<Payment>?) {
+fun InsightsScreen(bookings: List<Booking>?, payments: List<Payment>?, onPayments: () -> Unit = {}) {
     var periodIx by rememberSaveable { mutableIntStateOf(0) }
     val period = Period.entries[periodIx]
     val stats = remember(bookings, payments, period) { compute(bookings.orEmpty(), payments.orEmpty(), period) }
@@ -125,8 +125,14 @@ fun InsightsScreen(bookings: List<Booking>?, payments: List<Payment>?) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Royal, titleContentColor = Color.White),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Royal, titleContentColor = Color.White, actionIconContentColor = Color.White),
                 title = { Text("Insights", style = MaterialTheme.typography.headlineSmall) },
+                actions = {
+                    androidx.compose.material3.TextButton(onClick = onPayments) {
+                        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Outlined.ReceiptLong, null, tint = Color.White)
+                        Text("  Payments", color = Color.White)
+                    }
+                },
             )
         },
     ) { pad ->

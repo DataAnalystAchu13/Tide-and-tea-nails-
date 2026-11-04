@@ -1,7 +1,7 @@
-name: Deploy
+name: Deploy website
 
 # Builds the website from Supabase content and publishes it to Firebase Hosting (tideandteanails.in).
-# On pushes to main it also applies database migrations and deploys the Supabase edge functions.
+# The database and edge functions deploy separately, in deploy-supabase.yml.
 #
 # Runs when:
 #   - code changes land on main
@@ -12,15 +12,11 @@ name: Deploy
 # Repository secrets (Settings > Secrets and variables > Actions). Missing ones are skipped with a note:
 #   FIREBASE_SERVICE_ACCOUNT   JSON key of a service account with the "Firebase Hosting Admin" role
 #   FIREBASE_PROJECT_ID        Firebase project id (hosting only)
-#   SUPABASE_ACCESS_TOKEN      personal access token from supabase.com/dashboard/account/tokens
-#   SUPABASE_PROJECT_REF       the project ref, e.g. abcdefghijklmnop
-#   SUPABASE_DB_PASSWORD       the database password
-#   Optional, copied into Supabase edge function secrets:
-#   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET, GH_DISPATCH_TOKEN
+# The site reads Supabase with the public URL and anon key in website/public/config.js.
 on:
   push:
     branches: [main]
-    paths: ["website/**", "supabase/**", ".github/workflows/deploy-website.yml"]
+    paths: ["website/**", "supabase/functions/_shared/pricing.mjs", ".github/workflows/deploy-website.yml"]
   repository_dispatch:
     types: [publish-site]
   schedule:
@@ -28,7 +24,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy
+  group: deploy-website
   cancel-in-progress: false
 
 jobs:
@@ -36,8 +32,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      FULL: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
-      HAS_SUPABASE: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && secrets.SUPABASE_PROJECT_REF != '' }}
       HAS_FIREBASE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' && secrets.FIREBASE_PROJECT_ID != '' }}
     steps:
       - uses: actions/checkout@v4
@@ -47,52 +41,6 @@ jobs:
 
       - name: Test pricing and site build
         run: cd website/site && npm test
-
-      # ---------------- Supabase: database and edge functions ----------------
-      - uses: supabase/setup-cli@v1
-        if: env.FULL == 'true' && env.HAS_SUPABASE == 'true'
-        with:
-          version: latest
-      - name: Apply database migrations
-        if: env.FULL == 'true' && env.HAS_SUPABASE == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" -p "$SUPABASE_DB_PASSWORD"
-          supabase db push -p "$SUPABASE_DB_PASSWORD"
-      - name: Set edge function secrets
-        if: env.FULL == 'true' && env.HAS_SUPABASE == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
-          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
-          RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
-          GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
-        run: |
-          # Only secrets that exist in GitHub are copied; values set in the Supabase dashboard are left alone.
-          args=""
-          for k in RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET GH_DISPATCH_TOKEN; do
-            v="${!k}"; [ -n "$v" ] && args="$args $k=$v"
-          done
-          args="$args GH_REPO=${{ github.repository }}"
-          supabase secrets set --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" $args >/dev/null
-          echo "Edge function secrets updated."
-      - name: Deploy edge functions
-        if: env.FULL == 'true' && env.HAS_SUPABASE == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          ref="${{ secrets.SUPABASE_PROJECT_REF }}"
-          supabase functions deploy shop --project-ref "$ref"
-          supabase functions deploy publish-site --project-ref "$ref"
-          supabase functions deploy razorpay-webhook --project-ref "$ref" --no-verify-jwt
-          if [ -d supabase/functions/notify-owners ]; then
-            supabase functions deploy notify-owners --project-ref "$ref" --no-verify-jwt
-          fi
-      - name: Supabase not configured
-        if: env.HAS_SUPABASE != 'true'
-        run: echo "::notice::SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF is not set. Skipped database and functions. The site builds with whatever config.js points at."
 
       # ---------------- Website ----------------
       - name: Build website

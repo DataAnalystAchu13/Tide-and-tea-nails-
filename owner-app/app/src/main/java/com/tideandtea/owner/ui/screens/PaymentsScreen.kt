@@ -56,14 +56,15 @@ private val dayFmt = SimpleDateFormat("d MMM, h:mm a", Locale.ENGLISH)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PaymentsScreen(payments: List<Payment>?, onOpenBooking: (String) -> Unit) {
+fun PaymentsScreen(payments: List<Payment>?, onBack: (() -> Unit)? = null, onOpen: (Payment) -> Unit) {
     var filter by rememberSaveable { mutableIntStateOf(0) }
-    val filters = listOf("All", "Advances", "Balances")
+    val filters = listOf("All", "Advances", "Balances", "Shop")
     val shown = remember(payments, filter) {
         payments.orEmpty().filter {
             when (filter) {
                 1 -> it.kind == PaymentKind.ADVANCE
                 2 -> it.kind == PaymentKind.BALANCE
+                3 -> it.kind == PaymentKind.SHOP
                 else -> true
             }
         }
@@ -75,8 +76,13 @@ fun PaymentsScreen(payments: List<Payment>?, onOpenBooking: (String) -> Unit) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Royal, titleContentColor = Color.White),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Royal, titleContentColor = Color.White, navigationIconContentColor = Color.White),
                 title = { Text("Payments", style = MaterialTheme.typography.headlineSmall) },
+                navigationIcon = {
+                    if (onBack != null) androidx.compose.material3.IconButton(onClick = onBack) {
+                        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Outlined.ArrowBack, "Back")
+                    }
+                },
             )
         },
     ) { pad ->
@@ -112,7 +118,7 @@ fun PaymentsScreen(payments: List<Payment>?, onOpenBooking: (String) -> Unit) {
                         }
                         list.forEachIndexed { i, p ->
                             if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                            PaymentRow(p) { onOpenBooking(p.bookingId) }
+                            PaymentRow(p) { onOpen(p) }
                         }
                     }
                 }

@@ -244,12 +244,12 @@ begin
         'New press-on order ' || new.code,
         coalesce(new.customer->>'name', 'A customer') || ' · ' || items || ' item(s) · ' || private.money(new.total)
           || case when new.oversold then ' · check stock' else '' end,
-        jsonb_build_object('type', 'order', 'id', new.id::text));
+        jsonb_build_object('type', 'order', 'bookingId', new.id::text));
     elsif new.status = 'payment_submitted' then
       perform public.notify_owners(
         coalesce(new.customer->>'name', 'A customer') || ' paid for order ' || new.code,
         private.money(new.total) || ' · UPI ref ' || new.payment_ref || '. Tap to confirm.',
-        jsonb_build_object('type', 'order', 'id', new.id::text));
+        jsonb_build_object('type', 'order', 'bookingId', new.id::text));
     end if;
   end if;
   return new;

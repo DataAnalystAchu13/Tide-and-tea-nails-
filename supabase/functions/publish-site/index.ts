@@ -1,5 +1,5 @@
 // Owner taps "Publish website" in the app → this asks GitHub to rebuild and deploy the site.
-// Needs secrets GH_DISPATCH_TOKEN (fine-grained token with Actions: write on the repo) and GH_REPO ("owner/name").
+// Needs secrets GH_DISPATCH_TOKEN (fine-grained token with Contents: read and write on the repo) and GH_REPO ("owner/name").
 import { admin, caller, cors, isOwner, json, secret } from "../_shared/shop-db.ts";
 
 Deno.serve(async (req) => {

@@ -17,7 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Inbox
-import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -42,6 +43,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.tideandtea.owner.data.BookingStatus
+import com.tideandtea.owner.shop.ShopViewModel
+import com.tideandtea.owner.shop.shopGraph
 import com.tideandtea.owner.ui.screens.BookingDetailScreen
 import com.tideandtea.owner.ui.screens.ChatScreen
 import com.tideandtea.owner.ui.screens.ChatsScreen
@@ -56,12 +59,13 @@ import com.tideandtea.owner.ui.theme.TideTheme
 
 class MainActivity : ComponentActivity() {
     private val vm: OwnerViewModel by viewModels()
+    private val shop: ShopViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         handle(intent)
-        setContent { TideTheme { OwnerApp(vm) } }
+        setContent { TideTheme { OwnerApp(vm, shop) } }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -81,29 +85,38 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 
 private val TABS = listOf(
     Tab("list", "Requests", Icons.Outlined.Inbox),
+    Tab("orders", "Orders", Icons.Outlined.ShoppingBag),
     Tab("chats", "Chats", Icons.Outlined.Forum),
+    Tab("website", "Website", Icons.Outlined.Language),
     Tab("insights", "Insights", Icons.Outlined.Insights),
-    Tab("payments", "Payments", Icons.Outlined.ReceiptLong),
 )
 
 @Composable
-fun OwnerApp(vm: OwnerViewModel) {
+fun OwnerApp(vm: OwnerViewModel, shop: ShopViewModel) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(vm.message) {
         vm.message?.let { snackbar.showSnackbar(it); vm.message = null }
     }
+    LaunchedEffect(shop.message) {
+        shop.message?.let { snackbar.showSnackbar(it); shop.message = null }
+    }
+    // The shop data loads only for a signed-in owner (row level security hides it otherwise).
+    LaunchedEffect(vm.authState) {
+        if (vm.authState == AuthState.SignedIn) shop.start() else shop.stop()
+    }
     when (vm.authState) {
         AuthState.Checking -> SplashScreen()
         AuthState.SignedOut -> LoginScreen(vm.busy, vm.loginError, vm::signIn)
-        AuthState.SignedIn -> SignedInApp(vm, snackbar)
+        AuthState.SignedIn -> SignedInApp(vm, shop, snackbar)
     }
 }
 
 @Composable
-private fun SignedInApp(vm: OwnerViewModel, snackbar: SnackbarHostState) {
+private fun SignedInApp(vm: OwnerViewModel, shop: ShopViewModel, snackbar: SnackbarHostState) {
     val bookings by vm.bookings.collectAsStateWithLifecycle()
     val payments by vm.payments.collectAsStateWithLifecycle()
     val chats by vm.chats.collectAsStateWithLifecycle()
+    val orders by shop.orders.collectAsStateWithLifecycle()
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
@@ -116,12 +129,13 @@ private fun SignedInApp(vm: OwnerViewModel, snackbar: SnackbarHostState) {
     LaunchedEffect(vm.pendingOpen) {
         val target = vm.pendingOpen ?: return@LaunchedEffect
         val (type, id) = target.split(":", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
-        nav.navigate(if (type == "chat") "chat/$id" else "booking/$id")
+        nav.navigate(when (type) { "chat" -> "chat/$id"; "order" -> "order/$id"; else -> "booking/$id" })
         vm.pendingOpen = null
     }
 
     val newCount = bookings?.count { it.status == BookingStatus.REQUESTED || it.status == BookingStatus.PAYMENT_SUBMITTED } ?: 0
     val unreadChats = chats.count { it.ownerUnread > 0 }
+    val ordersToDo = orders?.count { it.needsAction } ?: 0
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -129,7 +143,7 @@ private fun SignedInApp(vm: OwnerViewModel, snackbar: SnackbarHostState) {
             if (route in TABS.map { it.route }) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     TABS.forEach { t ->
-                        val badge = when (t.route) { "list" -> newCount; "chats" -> unreadChats; else -> 0 }
+                        val badge = when (t.route) { "list" -> newCount; "orders" -> ordersToDo; "chats" -> unreadChats; "website" -> if (shop.unpublished) 1 else 0; else -> 0 }
                         NavigationBarItem(
                             selected = route == t.route,
                             onClick = {
@@ -140,7 +154,7 @@ private fun SignedInApp(vm: OwnerViewModel, snackbar: SnackbarHostState) {
                                 }
                             },
                             icon = {
-                                BadgedBox(badge = { if (badge > 0) Badge(containerColor = Pink, contentColor = Plum) { Text("$badge") } }) {
+                                BadgedBox(badge = { if (badge > 0) if (t.route == "website") Badge(containerColor = Pink) else Badge(containerColor = Pink, contentColor = Plum) { Text("$badge") } }) {
                                     Icon(t.icon, null)
                                 }
                             },
@@ -164,8 +178,16 @@ private fun SignedInApp(vm: OwnerViewModel, snackbar: SnackbarHostState) {
                 )
             }
             composable("chats") { ChatsScreen(chats) { id -> nav.navigate("chat/$id") } }
-            composable("insights") { InsightsScreen(bookings, payments) }
-            composable("payments") { PaymentsScreen(payments) { id -> nav.navigate("booking/$id") } }
+            composable("insights") { InsightsScreen(bookings, payments) { nav.navigate("payments") } }
+            composable("payments") {
+                PaymentsScreen(payments, onBack = { nav.popBackStack() }) { p ->
+                    when {
+                        p.orderId.isNotBlank() -> nav.navigate("order/${p.orderId}")
+                        p.bookingId.isNotBlank() -> nav.navigate("booking/${p.bookingId}")
+                    }
+                }
+            }
+            shopGraph(nav, shop, snackbar)
             composable("booking/{id}") { e ->
                 val id = e.arguments?.getString("id")
                 BookingDetailScreen(
