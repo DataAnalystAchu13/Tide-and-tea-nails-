@@ -2,10 +2,12 @@
 --  * New extension and add-on prices; no extra charge for length; painted art and 3D charms have no fixed price.
 --  * Travel is no longer priced by distance: the site shows a note and the owner confirms it.
 --  * Open Monday to Sunday.
+--  * Advance payments go to UPI ID 9043450513@upi.
 --  * Bookings can only be made from the next day (India time); same-day requests are refused.
 
 update public.config
 set data = data || $json${
+  "upiId": "9043450513@upi",
   "extensionTypes": [
     {
       "id": "softgel",

@@ -41,7 +41,7 @@ export const DEFAULT_CONFIG = {
   blockedDates: [],
   bookingWindowDays: 30,
   advancePercent: 30,
-  upiId: "yourname@upi",
+  upiId: "9043450513@upi",
   upiName: "Tide and Tea Nails",
   whatsapp: ""
 };
