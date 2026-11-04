@@ -13,7 +13,10 @@ Two parts share one Firebase project:
 2. The request appears instantly in the studio app under **New**, with the inspo pics, nail pics, extension type and location. Tap **Open in Maps** to see exactly where they are.
 3. You adjust the price if needed, add a note, and tap **Approve**. That time slot is then marked as booked on the website.
 4. The customer sees **Approved · pay advance** on the website, pays the advance with any UPI app (button or QR code), and enters the UPI transaction ID.
-5. The booking moves to **Check payment** in the app. You check the reference in your UPI app and tap **Confirm booking**.
+5. The booking moves to **Check payment** in the app. You check the reference in your UPI app and tap **Confirm booking**. The advance is added to **Payments**.
+6. After the appointment, tap **Paid in cash** or **Paid by UPI** to record the balance and close the booking.
+
+Your phone gets a push notification for every new request, every advance a client says they've paid, and every chat message. Clients can chat with you from their booking on the website and send photos and short videos (up to 60 MB); you reply from the **Chats** tab. **Insights** shows money collected, requests, approval rate, average booking, a weekly chart and your most requested sets.
 
 ## One-time setup (about 30 minutes)
 
@@ -49,12 +52,19 @@ Without a key the site still works: customers tap **Use my current location** an
    firebase deploy           # uploads the site and the security rules
    ```
 3. Your site is live at `https://YOUR-PROJECT.web.app`. Put this link in your Instagram bio.
+4. Turn on push notifications: in the same `website` folder run
+   ```
+   cd functions && npm install && cd ..
+   firebase deploy --only functions
+   ```
+   This uploads three small Cloud Functions that notify your phone. They run in `asia-south1` (Mumbai); change the region at the top of `functions/index.js` if your database is elsewhere. They stay well inside the free allowance for a studio.
 
 ### 6. Build the studio app
 1. Firebase console → Project settings → add an **Android** app with package name `com.tideandtea.owner`. Download `google-services.json` and put it in `owner-app/app/`.
 2. Open the `owner-app` folder in Android Studio, let it sync, plug in your phone (USB debugging on), and press **Run**.
 3. Sign in with the email and password from step 2.
-4. Tap **⋮ → Publish starter price list** once. This copies the starter prices to Firestore so the website shows them.
+4. Allow notifications when the app asks.
+5. Tap **⋮ → Publish starter price list** once. This copies the starter prices to Firestore so the website shows them.
 
 ### 7. Connect tideandteanails.in
 1. Firebase console → **Hosting** → **Add custom domain** → enter `tideandteanails.in` (then add `www.tideandteanails.in` and choose to redirect it to the main domain).
@@ -85,5 +95,6 @@ All starter prices are placeholders I made up. Replace them with your real price
 
 ## Good to know
 - Customers' bookings are tied to the browser they booked from. If they switch phones, they can still reach you on WhatsApp; you see everything in the app.
-- The app updates live while it's open. Push notifications for new requests when the app is closed need a small Cloud Function; that's a good next step.
-- Security rules (`website/firestore.rules`, `website/storage.rules`) make sure customers only see their own booking, can only add a payment reference after approval, and only owner accounts can read other customers' details, addresses and photo links.
+- Chat photos and videos are stored in Firebase Storage under `chats/`. Videos are uploaded as-is, so ask clients for short clips.
+- Payment history only counts money you confirm in the app (advances when you tap **Confirm booking**, balances when you mark a booking done).
+- Security rules (`website/firestore.rules`, `website/storage.rules`) make sure customers only see their own booking, can only add a payment reference after approval, and only owner accounts can read other customers' details, addresses, photo links, chats and payment history. A client can only read and write the chat for their own booking.

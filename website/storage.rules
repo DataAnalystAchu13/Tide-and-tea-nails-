@@ -6,6 +6,21 @@ service firebase.storage {
         && firestore.exists(/databases/(default)/documents/owners/$(request.auth.uid));
     }
 
+    // chats/{bookingId}/{fileName}: photos and videos sent in a booking's chat.
+    match /chats/{bookingId}/{fileName} {
+      function isClient() {
+        return request.auth != null
+          && firestore.get(/databases/(default)/documents/bookings/$(bookingId)).data.customerUid == request.auth.uid;
+      }
+      allow create: if (isOwner() || isClient())
+        && (
+          (request.resource.contentType.matches('image/.*') && request.resource.size < 12 * 1024 * 1024)
+          || (request.resource.contentType.matches('video/.*') && request.resource.size < 60 * 1024 * 1024)
+        );
+      allow read: if isOwner() || isClient();
+      allow delete: if isOwner();
+    }
+
     // bookings/{customerUid}/{bookingId}/{inspo_1.jpg | natural_1.jpg ...}
     match /bookings/{customerUid}/{bookingId}/{fileName} {
       allow create: if request.auth != null

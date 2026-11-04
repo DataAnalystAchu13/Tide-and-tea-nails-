@@ -11,7 +11,10 @@ service cloud.firestore {
 
     match /owners/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
-      allow write: if false;
+      // An owner may only add or remove their own push-notification tokens.
+      allow update: if isOwner() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens']);
+      allow create, delete: if false;
     }
 
     // Price list, slots, studio location, UPI details. Everyone reads, only owners change.
@@ -24,6 +27,42 @@ service cloud.firestore {
     match /slots/{date} {
       allow read: if true;
       allow write: if isOwner();
+    }
+
+    // Owner phone tokens for push notifications live on owners/{uid} (fcmTokens array),
+    // written by the owner app. Cloud Functions read them with admin access.
+
+    // Payment history. Written by the owner app when an advance or balance is confirmed.
+    match /payments/{paymentId} {
+      allow read, write: if isOwner();
+    }
+
+    // One chat per booking: chats/{bookingId} holds the summary, messages live underneath.
+    match /chats/{bookingId} {
+      function bookingOwnerUid() {
+        return get(/databases/$(database)/documents/bookings/$(bookingId)).data.customerUid;
+      }
+      function isClient() { return signedIn() && bookingOwnerUid() == request.auth.uid; }
+
+      allow read: if isOwner() || isClient();
+      allow create: if isOwner() || (isClient() && request.resource.data.customerUid == request.auth.uid);
+      allow update: if isOwner() || (
+        isClient()
+        && request.resource.data.customerUid == resource.data.customerUid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'lastText', 'lastFrom', 'lastAt', 'ownerUnread', 'customerUnread'])
+      );
+
+      match /messages/{messageId} {
+        allow read: if isOwner() || isClient();
+        allow create: if (
+            (isOwner() && request.resource.data.from == 'owner')
+            || (isClient() && request.resource.data.from == 'customer')
+          )
+          && request.resource.data.text is string && request.resource.data.text.size() <= 2000
+          && (!('mediaUrl' in request.resource.data) || request.resource.data.mediaType in ['image', 'video']);
+        allow update, delete: if isOwner();
+      }
     }
 
     match /bookings/{bookingId} {
