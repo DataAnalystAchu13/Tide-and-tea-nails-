@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
 
   const db = admin();
   const { data: row } = await db.from("site_publishes").insert({ requested_by: user.id }).select("id").single();
-  const token = secret("GH_DISPATCH_TOKEN");
+  const token = (secret("GH_DISPATCH_TOKEN") || "").trim();
   const repo = secret("GH_REPO") || "DataAnalystAchu13/Tide-and-tea-nails-";
   if (!token) {
     await db.from("site_publishes").update({ status: "failed", detail: "GH_DISPATCH_TOKEN not set" }).eq("id", row?.id);
@@ -21,6 +21,19 @@ Deno.serve(async (req) => {
     body: JSON.stringify({ event_type: "publish-site", client_payload: { by: user.id } }),
   });
   const ok = res.status === 204;
-  await db.from("site_publishes").update({ status: ok ? "dispatched" : "failed", detail: ok ? "" : `GitHub ${res.status}` }).eq("id", row?.id);
-  return json(ok ? { ok: true } : { ok: false, error: "Couldn't start publishing. Try again in a minute." });
+  let why = "";
+  if (!ok) {
+    const body = (await res.text().catch(() => "")).slice(0, 300);
+    let msg = "";
+    try { msg = JSON.parse(body).message || ""; } catch { msg = body; }
+    why = res.status === 401
+      ? "The publish token is wrong or expired. Make a new PUBLISH_TOKEN."
+      : res.status === 403 || res.status === 404
+        ? "The publish token can't reach the repository. It needs resource owner DataAnalystAchu13, this repository selected, and Contents: Read and write."
+        : `GitHub said ${res.status}.`;
+    why += msg ? ` (GitHub: ${msg})` : "";
+    console.error(`publish dispatch failed: ${res.status} ${body}`);
+  }
+  await db.from("site_publishes").update({ status: ok ? "dispatched" : "failed", detail: ok ? "" : why }).eq("id", row?.id);
+  return json(ok ? { ok: true } : { ok: false, error: `Couldn't start publishing. ${why}` });
 });
