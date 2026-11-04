@@ -4,6 +4,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.ColorLens
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalShipping
@@ -32,7 +35,7 @@ val SITE_PAGES = listOf(
     EditPage("home", "Home page", "Headline, intro and hero photo", Icons.Outlined.Home, false, listOf(
         FormSection("Top of the page", listOf(
             F.Text("home.eyebrow", "Small line above the headline"),
-            F.Text("home.title", "Headline", hint = "Wrap words in *stars* to colour them pink"),
+            F.Text("home.title", "Headline", hint = "Wrap words in *stars* to write them in script"),
             F.Text("home.text", "Intro", lines = 3),
             F.Image("home.heroImage", "Hero photo"),
         )),
@@ -44,12 +47,84 @@ val SITE_PAGES = listOf(
             F.Text("brand.tagline", "Tagline"),
         )),
     )),
-    EditPage("about", "About us", "Your story and studio photos", Icons.Outlined.Badge, false, listOf(
-        FormSection("About us", listOf(
-            F.Text("about.title", "Heading"),
-            F.Text("about.body", "Your story", lines = 8),
+    EditPage("sections", "Home page sections", "Buttons, headings, steps; show or hide", Icons.Outlined.Dashboard, false, listOf(
+        FormSection("Buttons under the headline", listOf(
+            F.Text("texts.home.bookButton", "First button", hint = "Book a home visit"),
+            F.Text("texts.home.shopButton", "Second button", hint = "Shop press-ons"),
+        )),
+        FormSection("How it works", listOf(
+            F.Bool("texts.show.steps", "Show the four steps", default = true),
+            F.Rows("texts.steps", "Steps", listOf(Col("title", "Step"), Col("text", "What happens", lines = 2)), add = "Add a step"),
+            F.Note("Up to four steps show. Remove them all to bring back the standard ones."),
+        )),
+        FormSection("Services", listOf(
+            F.Bool("texts.show.services", "Show services", default = true),
+            F.Text("texts.home.servicesTitle", "Heading", hint = "Nail extensions *at home*"),
+            F.Text("texts.home.servicesLink", "Link text", hint = "Full price list"),
+        )),
+        FormSection("Press-on shop", listOf(
+            F.Bool("texts.show.shop", "Show press-ons", default = true),
+            F.Text("texts.home.shopTitle", "Heading", hint = "Press-on *drops*"),
+            F.Text("texts.home.shopLink", "Link text", hint = "Shop all"),
+        )),
+        FormSection("Reviews", listOf(
+            F.Bool("texts.show.reviews", "Show reviews", default = true),
+            F.Text("texts.home.reviewsTitle", "Heading", hint = "Kind *words*"),
+            F.Text("texts.home.reviewsLink", "Link text", hint = "All reviews"),
+        )),
+        FormSection("Blog", listOf(
+            F.Bool("texts.show.blog", "Show blog posts", default = true),
+            F.Text("texts.home.blogTitle", "Heading", hint = "From the *blog*"),
+            F.Text("texts.home.blogLink", "Link text", hint = "All posts"),
+        )),
+        FormSection("Questions", listOf(
+            F.Bool("texts.show.faq", "Show questions", default = true),
+            F.Text("texts.home.faqTitle", "Heading", hint = "Questions, *answered*"),
+        )),
+        FormSection("Instagram band", listOf(
+            F.Bool("texts.show.follow", "Show the Instagram band", default = true),
+            F.Text("texts.home.followTitle", "Heading", hint = "Fresh sets *every week*"),
+            F.Text("texts.home.followText", "Line after your handle", hint = "for new designs, offers and press-on drops."),
+            F.Text("texts.home.followButton", "Button", hint = "Follow on Instagram"),
+        )),
+        FormSection("Areas", listOf(
+            F.Bool("texts.show.areas", "Show the areas you visit", default = true),
+            F.Text("texts.home.areasTitle", "Heading", hint = "Home visits across {area}"),
+        )),
+        FormSection("Tips", listOf(F.Note("Leave a box empty to use the standard wording shown in grey. Wrap words in *stars* to write them in script. {area} becomes your home visit area."))),
+    )),
+    EditPage("pagetext", "Page headings", "Top of the shop, prices, booking and other pages", Icons.Outlined.Title, false, listOf(
+        pageHeading("book", "Booking page", "Book online", "Book your *set*", "Takes about two minutes. Pay a small advance by UPI to hold your slot, refunded in full if we can't do your set."),
+        pageHeading("services", "Prices page", "Price list", "Services and *prices*", "Every extension is done at your home across {area}. The final price is confirmed on WhatsApp before your visit."),
+        pageHeading("shop", "Shop page", "Press-on nails", "Press-ons, *made to fit*", "Reusable salon-quality press-on sets, shipped across India."),
+        pageHeading("reviews", "Reviews page", "Reviews", "Kind *words*", "What our clients say about their sets."),
+        pageHeading("blog", "Blog page", "Blog", "Nail *notes*", "Care tips, trends and press-on how-tos."),
+        pageHeading("contact", "Contact page", "Contact", "Say *hello*", "We come to you anywhere in {area}. Message us with any question."),
+        pageHeading("policies", "Policies page", "Policies", "The *small print*", ""),
+        FormSection("Tips", listOf(F.Note("Leave a box empty to use the wording shown in grey. *stars* write words in script. {area} becomes your home visit area."))),
+    )),
+    EditPage("theme", "Colours", "Main colour, accent and background", Icons.Outlined.ColorLens, false, listOf(
+        FormSection("Website colours", listOf(
+            F.Color("theme.primary", "Main colour", listOf("#3a1d5c", "#5b2d8a", "#2a1824", "#1f3b4d", "#2f4a3a"), "Header, buttons, headings and prices"),
+            F.Color("theme.accent", "Accent on the dark header", listOf("#ffffff", "#f4b3cb", "#e9d8f7", "#c9a35e", "#f3e3c3"), "Buttons and script words on the dark top section"),
+            F.Color("theme.background", "Page background", listOf("#ffffff", "#faf7f4", "#f7f2fb", "#f6f3ef"), "Behind the cards on every page"),
+            F.Note("Auto uses the standard Tide & Tea colours. Publish to see changes on the site."),
+        )),
+    )),
+    EditPage("about", "About me", "Your photo, your story and sign-off", Icons.Outlined.Badge, false, listOf(
+        FormSection("Your photo", listOf(
+            F.Image("about.photo", "Photo of you"),
+            F.Text("about.caption", "Handwritten caption under the photo", hint = "the girl behind the nails"),
+        )),
+        FormSection("Your story", listOf(
+            F.Text("about.title", "Heading", hint = "hii girlies, *I'm Akshaya!* 🎀🤎"),
+            F.Text("about.body", "Your story", lines = 10),
             F.Note(MD),
-            F.Images("about.images", "Photos", max = 6),
+            F.Text("about.signoff", "Sign-off", hint = "With love,"),
+            F.Text("about.signature", "Signature", hint = "Akshaya ♡"),
+        )),
+        FormSection("More photos (optional)", listOf(
+            F.Images("about.images", "Studio or work photos shown under your story", max = 4),
         )),
     )),
     EditPage("contact", "Contact and hours", "Phone, WhatsApp, address, Google", Icons.Outlined.Call, false, listOf(
@@ -170,5 +245,11 @@ val PRICE_PAGES = listOf(
         )),
     )),
 )
+
+private fun pageHeading(key: String, title: String, eyebrow: String, head: String, text: String) = FormSection(title, listOf(
+    F.Text("texts.pages.$key.eyebrow", "Small line", hint = eyebrow),
+    F.Text("texts.pages.$key.title", "Heading", hint = head),
+    F.Text("texts.pages.$key.text", "Intro", lines = 2, hint = text.ifEmpty { "Optional" }),
+))
 
 fun editPage(key: String) = (SITE_PAGES + PRICE_PAGES).firstOrNull { it.key == key }

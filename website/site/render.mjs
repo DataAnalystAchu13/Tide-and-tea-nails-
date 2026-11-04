@@ -52,6 +52,19 @@ function contactLinks(c) {
 
 /** Where home visits go, e.g. "Chennai and Chengalpattu". */
 const serviceArea = (c) => c.site.contact.serviceArea || c.site.contact.city || "Chennai";
+/** Owner-editable wording (site.texts), with {area} filled in. Blank fields already fall back to defaults. */
+const tx = (c, path) => String(path.split(".").reduce((o, k) => (o == null ? o : o[k]), c.site.texts || {}) ?? "").replaceAll("{area}", serviceArea(c));
+const shows = (c, key) => ((c.site.texts || {}).show || {})[key] !== false;
+/** Owner-chosen colours, accepted only as plain hex so nothing else can reach the stylesheet. */
+export function themeCss(c) {
+  const t = c.site.theme || {};
+  const hex = (v) => (/^#[0-9a-f]{6}$/i.test(String(v || "").trim()) ? String(v).trim() : "");
+  const vars = [];
+  if (hex(t.primary)) vars.push(`--royal:${hex(t.primary)}`, `--royal-2:color-mix(in srgb, ${hex(t.primary)} 82%, white)`, `--plum:color-mix(in srgb, ${hex(t.primary)} 70%, black)`, `--pink-deep:${hex(t.primary)}`);
+  if (hex(t.accent)) vars.push(`--pink:${hex(t.accent)}`);
+  if (hex(t.background)) vars.push(`--mist:${hex(t.background)}`);
+  return vars.length ? `<style>:root{${vars.join(";")}}</style>` : "";
+}
 
 function addressLine(c) {
   const k = c.site.contact;
@@ -124,7 +137,7 @@ function header(c, path) {
   const link = ([href, label]) => `<a href="${href}"${path.startsWith(href.split("#")[0]) ? ' aria-current="page"' : ""}>${label}</a>`;
   return `<header class="site-head">
   <div class="wrap head-inner">
-    <a class="brand" href="/"><img src="/logo.webp" alt="" width="40" height="40"><span>${esc(c.site.brand.name.replace(/ Nails$/, ""))}</span></a>
+    <a class="brand" href="/"><img src="/logo.webp" alt="" width="40" height="40"><span>${esc(c.site.brand.name)}</span></a>
     <nav class="mainnav" aria-label="Main">${NAV.filter(([h]) => !h.startsWith("/book/")).map(link).join("")}</nav>
     <div class="head-actions">
       <a class="cart-link" href="/cart/" aria-label="Cart"><svg aria-hidden="true"><use href="#i-bag"/></svg><span class="cart-count" data-cart-count hidden>0</span></a>
@@ -201,8 +214,9 @@ ${noindex ? '<meta name="robots" content="noindex, follow">' : `<link rel="canon
 <meta name="apple-mobile-web-app-title" content="Tide &amp; Tea">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Allura&family=Nunito:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="/styles.css">
+${themeCss(c)}
 ${head}
 ${jsonld.map(ld).join("\n")}
 </head>
@@ -303,7 +317,7 @@ function faqBlock(c) {
   const f = (c.site.faq || []).filter((x) => x && x.q && x.a);
   if (!f.length) return "";
   return `<section class="section"><div class="wrap">
-  <h2>Questions, answered</h2>
+  <h2>${rich(tx(c, "home.faqTitle"))}</h2>
   <div class="faq">${f.map((x) => `<details><summary>${esc(x.q)}</summary><div>${md(x.a)}</div></details>`).join("")}</div>
 </div></section>`;
 }
@@ -314,11 +328,11 @@ const faqLd = (c) => {
 
 function followBand(c) {
   const L = contactLinks(c);
-  if (!L.ig) return "";
+  if (!L.ig || !shows(c, "follow")) return "";
   return `<section class="section"><div class="wrap"><div class="igband">
   <svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg>
-  <div><h2>Fresh sets every week</h2><p>Follow <b>@${esc(L.ig)}</b> for new designs, offers and press-on drops.</p></div>
-  <a class="btn btn-pink" href="${esc(L.igUrl)}" rel="noopener" target="_blank"><svg class="ico" aria-hidden="true"><use href="#i-ig"/></svg>Follow on Instagram</a>
+  <div><h2>${rich(tx(c, "home.followTitle"))}</h2><p>Follow <b>@${esc(L.ig)}</b> ${esc(tx(c, "home.followText"))}</p></div>
+  <a class="btn btn-pink" href="${esc(L.igUrl)}" rel="noopener" target="_blank"><svg class="ico" aria-hidden="true"><use href="#i-ig"/></svg>${esc(tx(c, "home.followButton"))}</a>
 </div></div></section>`;
 }
 
@@ -345,8 +359,8 @@ export function home(c, now) {
         <h1>${rich(h.title)}</h1>
         <p class="lede">${esc(h.text)}</p>
         <div class="hero-cta">
-          <a class="btn btn-pink" href="/book/#book">Book a home visit</a>
-          <a class="btn btn-ghost" href="/shop/">Shop press-ons</a>
+          <a class="btn btn-pink" href="/book/#book">${esc(tx(c, "home.bookButton"))}</a>
+          <a class="btn btn-ghost" href="/shop/">${esc(tx(c, "home.shopButton"))}</a>
         </div>
         <p class="hero-note">Sets from ${money(from)} · home visits across ${esc(serviceArea(c))} · open ${esc((k.hours || [])[0]?.days || "every day")}</p>
       </div>
@@ -359,40 +373,35 @@ export function home(c, now) {
   </div>
 </section>
 
-<section class="steps-strip" aria-label="How booking works">
-  <ol class="how">
-    <li><b>Request</b><span>Pick your set, slot and location, add inspo pics.</span></li>
-    <li><b>We review</b><span>We check your inspo and nails, then approve.</span></li>
-    <li><b>Pay advance</b><span>A small advance locks your slot.</span></li>
-    <li><b>Nail day</b><span>We arrive with everything. You relax.</span></li>
-  </ol>
-</section>
+${shows(c, "steps") ? `<section class="steps-strip" aria-label="How booking works">
+  <ol class="how">${(c.site.texts.steps || []).slice(0, 4).map((x) => `<li><b>${esc(x.title || "")}</b><span>${esc(x.text || "")}</span></li>`).join("")}</ol>
+</section>` : ""}
 
-<section class="section"><div class="wrap">
-  <div class="sec-head"><h2>Nail extensions at home</h2><a class="more" href="/services/">Full price list</a></div>
+${shows(c, "services") ? `<section class="section"><div class="wrap">
+  <div class="sec-head"><h2>${rich(tx(c, "home.servicesTitle"))}</h2><a class="more" href="/services/">${esc(tx(c, "home.servicesLink"))}</a></div>
   <div class="svc-grid">${c.config.extensionTypes.slice(0, 6).map((t) => `<a class="svc card" href="/book/#book"><h3>${esc(t.name)}</h3><p>${esc(t.description || "")}</p><span class="svc-price">from ${money(t.price)}</span></a>`).join("")}</div>
-</div></section>
+</div></section>` : ""}
 
-${shopPicks.length ? `<section class="section"><div class="wrap">
-  <div class="sec-head"><h2>Press-on drops</h2><a class="more" href="/shop/">Shop all</a></div>
+${shopPicks.length && shows(c, "shop") ? `<section class="section"><div class="wrap">
+  <div class="sec-head"><h2>${rich(tx(c, "home.shopTitle"))}</h2><a class="more" href="/shop/">${esc(tx(c, "home.shopLink"))}</a></div>
   <div class="pgrid">${shopPicks.map((p) => productCard(c, p, now)).join("")}</div>
 </div></section>` : ""}
 
-${showReviews.length ? `<section class="section"><div class="wrap">
-  <div class="sec-head"><h2>Kind words</h2><a class="more" href="/reviews/">All reviews</a></div>
+${showReviews.length && shows(c, "reviews") ? `<section class="section"><div class="wrap">
+  <div class="sec-head"><h2>${rich(tx(c, "home.reviewsTitle"))}</h2><a class="more" href="/reviews/">${esc(tx(c, "home.reviewsLink"))}</a></div>
   <div class="review-grid">${showReviews.map(reviewCard).join("")}</div>
   ${k.googleReviewUrl ? `<p class="center"><a class="btn btn-quiet" href="${esc(k.googleReviewUrl)}" rel="noopener" target="_blank">Read our Google reviews</a></p>` : ""}
 </div></section>` : ""}
 
-${c.posts.length ? `<section class="section"><div class="wrap">
-  <div class="sec-head"><h2>From the blog</h2><a class="more" href="/blog/">All posts</a></div>
+${c.posts.length && shows(c, "blog") ? `<section class="section"><div class="wrap">
+  <div class="sec-head"><h2>${rich(tx(c, "home.blogTitle"))}</h2><a class="more" href="/blog/">${esc(tx(c, "home.blogLink"))}</a></div>
   <div class="post-grid">${c.posts.slice(0, 3).map(postCard).join("")}</div>
 </div></section>` : ""}
 
-${faqBlock(c)}
+${shows(c, "faq") ? faqBlock(c) : ""}
 ${followBand(c)}
-${c.areas.length ? `<section class="section areas-sec"><div class="wrap">
-  <h2>Home visits across ${esc(serviceArea(c))}</h2>
+${c.areas.length && shows(c, "areas") ? `<section class="section areas-sec"><div class="wrap">
+  <h2>${rich(tx(c, "home.areasTitle"))}</h2>
   <div class="area-chips">${c.areas.map((a) => `<a class="area-chip" href="/nail-extensions-in-${a.slug}/">${esc(a.name)}</a>`).join("")}</div>
 </div></section>` : ""}`;
   return {
@@ -410,7 +419,7 @@ ${c.areas.length ? `<section class="section areas-sec"><div class="wrap">
 }
 
 export function services(c) {
-  const body = `${pageHead("Price list", "Services and *prices*", `Every extension is done at your home across ${serviceArea(c)}. Final price is confirmed when we approve your request.`, `<div class="hero-cta"><a class="btn btn-pink" href="/book/#book">Book a set</a></div>`)}
+  const body = `${pageHead(tx(c, "pages.services.eyebrow"), tx(c, "pages.services.title"), tx(c, "pages.services.text"), `<div class="hero-cta"><a class="btn btn-pink" href="/book/#book">${esc(tx(c, "pages.services.button"))}</a></div>`)}
 <section class="section"><div class="wrap">${priceGrid(c)}</div></section>
 ${faqBlock(c)}`;
   return {
@@ -430,7 +439,7 @@ export function shop(c, now) {
   const lengths = [...new Set(c.products.map((p) => p.length).filter((s) => s && s !== "Any"))];
   const chip = (group, v) => `<label class="chip"><input type="radio" name="${group}" value="${esc(v)}"${v === "" ? " checked" : ""}><span>${esc(v || "All")}</span></label>`;
   const ship = c.site.shipping;
-  const body = `${pageHead("Press-on nails", "Press-ons, *made to fit*", `Reusable salon-quality press-on sets, shipped across India.${ship.freeAbove ? ` Free shipping over ${money(ship.freeAbove)}.` : ""}`)}
+  const body = `${pageHead(tx(c, "pages.shop.eyebrow"), tx(c, "pages.shop.title"), `${tx(c, "pages.shop.text")}${ship.freeAbove ? ` Free shipping over ${money(ship.freeAbove)}.` : ""}`)}
 <section class="section"><div class="wrap">
   ${c.products.length ? `<div class="filters" id="filters">
     ${shapes.length > 1 ? `<div class="chips" role="radiogroup" aria-label="Shape">${chip("shape", "")}${shapes.map((s) => chip("shape", s)).join("")}</div>` : ""}
@@ -575,21 +584,35 @@ export function orders(c) {
 
 export function about(c) {
   const a = c.site.about;
-  const body = `${pageHead("About us", a.title)}
-<section class="section"><div class="wrap about">
-  <div class="prose">${md(a.body)}</div>
-  ${(a.images || []).length ? `<div class="about-pics">${a.images.slice(0, 4).map((u) => img(u, `${c.site.brand.name}`)).join("")}</div>` : `<div class="about-pics solo"><img class="logo-badge" src="/logo.webp" alt="${esc(c.site.brand.name)} logo" width="320" height="320" loading="lazy"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg></div>`}
-</div></section>
+  const photo = a.photo || "";
+  const extra = (a.images || []).filter(Boolean);
+  const body = `${pageHead("About me", a.title)}
+<section class="section"><div class="wrap aboutme">
+  <figure class="polaroid">
+    <span class="tape" aria-hidden="true"></span>
+    ${photo ? img(photo, `The founder of ${c.site.brand.name}`, "", true) : `<img class="logo-badge" src="/logo.webp" alt="${esc(c.site.brand.name)} logo" width="320" height="320">`}
+    ${a.caption ? `<figcaption>${esc(a.caption)}</figcaption>` : ""}
+    <svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg>
+    <svg class="sp sp1" aria-hidden="true"><use href="#sparkle"/></svg><svg class="sp sp2" aria-hidden="true"><use href="#sparkle"/></svg>
+  </figure>
+  <article class="letter card">
+    <div class="prose">${md(a.body)}</div>
+    ${a.signoff || a.signature ? `<p class="signoff">${esc(a.signoff || "")}<span>${esc(a.signature || "")}</span></p>` : ""}
+    <div class="hero-cta"><a class="btn btn-primary" href="/book/#book">Book your set with me</a><a class="btn btn-quiet" href="/shop/">Shop press-ons</a></div>
+  </article>
+</div>
+${extra.length ? `<div class="wrap"><div class="about-pics strip">${extra.slice(0, 4).map((u) => img(u, c.site.brand.name)).join("")}</div></div>` : ""}
+</section>
 ${followBand(c)}`;
   return {
     path: "/about/",
-    html: layout(c, { path: "/about/", title: "About us", description: plain(a.body, 155), body, jsonld: [salonLd(c), crumbs(c, [["Home", "/"], ["About", "/about/"]])] }),
+    html: layout(c, { path: "/about/", title: "About me", description: plain(a.body, 155), ogImage: photo ? (photo.startsWith("/") ? absUrl(c, photo) : photo) : "", body, jsonld: [salonLd(c), crumbs(c, [["Home", "/"], ["About", "/about/"]])] }),
   };
 }
 
 export function reviews(c) {
   const k = c.site.contact;
-  const body = `${pageHead("Reviews", "Kind *words*", "What our clients say about their sets.", k.googleReviewUrl ? `<div class="hero-cta"><a class="btn btn-pink" href="${esc(k.googleReviewUrl)}" rel="noopener" target="_blank">Review us on Google</a></div>` : "")}
+  const body = `${pageHead(tx(c, "pages.reviews.eyebrow"), tx(c, "pages.reviews.title"), tx(c, "pages.reviews.text"), k.googleReviewUrl ? `<div class="hero-cta"><a class="btn btn-pink" href="${esc(k.googleReviewUrl)}" rel="noopener" target="_blank">Review us on Google</a></div>` : "")}
 <section class="section"><div class="wrap">
   ${c.reviews.length ? `<div class="review-grid">${c.reviews.map(reviewCard).join("")}</div>` : `<div class="empty card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><p>Reviews are on their way.</p></div>`}
 </div></section>`;
@@ -600,7 +623,7 @@ export function reviews(c) {
 }
 
 export function blog(c) {
-  const body = `${pageHead("Blog", "Nail *notes*", "Care tips, trends and press-on how-tos.")}
+  const body = `${pageHead(tx(c, "pages.blog.eyebrow"), tx(c, "pages.blog.title"), tx(c, "pages.blog.text"))}
 <section class="section"><div class="wrap">
   ${c.posts.length ? `<div class="post-grid">${c.posts.map(postCard).join("")}</div>` : `<div class="empty card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><p>First post coming soon.</p></div>`}
 </div></section>`;
@@ -647,7 +670,7 @@ export function contact(c) {
     L.igUrl && `<a class="crow card" href="${esc(L.igUrl)}" rel="noopener" target="_blank"><b>Instagram</b><span>@${esc(L.ig)}</span></a>`,
   ].filter(Boolean).join("");
   const hours = (k.hours || []).filter((h) => h && h.days).map((h) => `<li><span>${esc(h.days)}</span><span>${esc(h.time)}</span></li>`).join("");
-  const body = `${pageHead("Contact", "Say *hello*", k.homeVisitsOnly ? `We come to you anywhere in ${serviceArea(c)}. Message us with any question.` : "Visit the studio or message us with any question.")}
+  const body = `${pageHead(tx(c, "pages.contact.eyebrow"), tx(c, "pages.contact.title"), tx(c, "pages.contact.text"))}
 <section class="section"><div class="wrap contact">
   <div class="contact-list">${rows || `<p class="muted">Contact details coming soon.</p>`}
     ${hours ? `<div class="card hours-card"><h3>Hours</h3><ul class="hours">${hours}</ul></div>` : ""}
@@ -690,7 +713,7 @@ export function policies(c) {
   const p = c.site.policies;
   const sections = [["shipping", "Shipping"], ["returns", "Returns and damaged orders"], ["cancellation", "Cancellations and refunds"], ["privacy", "Privacy"], ["terms", "Terms"]];
   const k = c.site.contact;
-  const body = `${pageHead("Policies", "The *small print*")}
+  const body = `${pageHead(tx(c, "pages.policies.eyebrow"), tx(c, "pages.policies.title"), tx(c, "pages.policies.text"))}
 <section class="section"><div class="wrap narrow">
   <nav class="toc">${sections.map(([id, t]) => `<a href="#${id}">${t}</a>`).join("")}</nav>
   ${sections.map(([id, t]) => `<section id="${id}" class="policy"><h2>${t}</h2><div class="prose">${md(p[id] || "")}</div></section>`).join("")}
@@ -700,7 +723,7 @@ export function policies(c) {
 }
 
 export function book(c, partial) {
-  const body = `${pageHead("Book online", "Book your *set*", "Takes about two minutes. Nothing is charged until we approve your request.", `<div class="hero-cta"><a class="btn btn-ghost btn-sm" href="#mine" id="navMine" hidden>My bookings</a><a class="btn btn-ghost btn-sm" href="#prices">Price list</a></div>`)}
+  const body = `${pageHead(tx(c, "pages.book.eyebrow"), tx(c, "pages.book.title"), tx(c, "pages.book.text"), `<div class="hero-cta"><a class="btn btn-ghost btn-sm" href="#mine" id="navMine" hidden>My bookings</a><a class="btn btn-ghost btn-sm" href="#prices">Price list</a></div>`)}
 ${partial.replace('id="book"', `id="book" data-area="${esc(serviceArea(c))}" data-wa="${esc(c.site.contact.whatsapp || c.site.contact.phone || "")}"`)}`;
   return {
     path: "/book/",
@@ -752,8 +775,9 @@ export function hi(c) {
 <link rel="icon" type="image/png" href="/favicon.png">
 <script>/* Seen the card before? Go straight on. */try{var t=new URLSearchParams(location.search).get("to")||"/";if(!/^\\/(?!\\/)/.test(t))t="/";window.__hiTo=t;if(localStorage.getItem("tt.hi.seen"))location.replace(t)}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Allura&family=Nunito:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="/styles.css">
+${themeCss(c)}
 </head><body class="is-hi">${SPRITE}${body}
 <script type="module" src="/hi.js" data-seconds="${seconds}"></script>
 </body></html>`;

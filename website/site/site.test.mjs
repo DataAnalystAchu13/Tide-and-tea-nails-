@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { md, plain, slugify, esc } from "./md.mjs";
-import { igHandle } from "./render.mjs";
+import { igHandle, themeCss } from "./render.mjs";
+import { fillBlanks } from "./content.mjs";
 import { build } from "./build.mjs";
 
 test("markdown escapes HTML typed in the app", () => {
@@ -43,4 +44,21 @@ test("preview build writes every page with valid structured data", async () => {
   }
   const sitemap = await readFile(new URL("../dist/sitemap.xml", import.meta.url), "utf8");
   assert.ok(!sitemap.includes("/cart/") && sitemap.includes("/shop/"));
+});
+
+test("owner colours accept only hex codes", () => {
+  const c = { site: { theme: { primary: "#112233", accent: "red;}body{display:none", background: "" } } };
+  const css = themeCss(c);
+  assert.ok(css.includes("--royal:#112233"));
+  assert.ok(!css.includes("display:none"));
+  assert.equal(themeCss({ site: { theme: {} } }), "");
+});
+
+test("blank texts fall back to defaults, hidden sections disappear", async () => {
+  const base = { a: "Default", rows: [{ t: "x" }], show: { steps: true } };
+  assert.deepEqual(fillBlanks(base, { a: " ", rows: [{ t: "" }], show: { steps: false } }), { a: "Default", rows: [{ t: "x" }], show: { steps: false } });
+  const { pages } = await build({ quiet: true });
+  const h = pages.find((p) => p.path === "/").html;
+  assert.ok(h.includes('class="steps-strip"'));
+  assert.ok(h.includes("Pay advance"));
 });

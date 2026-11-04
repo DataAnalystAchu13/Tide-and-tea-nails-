@@ -31,8 +31,12 @@
     "offerText": ""
   },
   "about": {
-    "title": "Hi, we're Tide & Tea",
-    "body": "Tide & Tea Nails is a Chennai nail studio that comes to you. Every set starts with your inspo and a look at your natural nails, so we can suggest the extension that will last best on you.\n\nWe sterilise our metal tools between every client and use a fresh file and buffer for each set.\n\n*Edit this story in the owner app under Website, then About us.*",
+    "title": "hii girlies, *I'm Akshaya!* 🎀🤎",
+    "body": "My love for nails started when I was just a little girl. I used to find random things around the house and turn them into little tools to create my own nail art. Little did I know that this tiny childhood obsession would one day turn into something so special to me. 🥹\n\nAnd that's how Tide and Tea Nails was born! ✨\n\nEvery booking, every order, every little bit of love and every person who trusts me with their nails means more than words can explain. You're not just booking a nail appointment; you're helping me get one little step closer to a dream I've held onto for years.\n\nThank you for being here, supporting my little dream and letting me be a tiny part of your special moments. Here's to more pretty nails, happy clients and lots of love! 💌",
+    "signoff": "With love,",
+    "signature": "Akshaya ♡",
+    "photo": "/akshaya.webp",
+    "caption": "the girl behind the nails",
     "images": []
   },
   "follow": {
@@ -84,7 +88,7 @@
     },
     {
       "q": "How do I pay?",
-      "a": "For appointments, a small advance by UPI confirms your slot after we approve your request. The balance is paid on the day. Press-on orders are paid online at checkout."
+      "a": "For appointments, pay a small advance by UPI right after you book to hold your slot. If we can't do your set, we refund it in full. The balance is paid on the day. Press-on orders are paid online at checkout."
     }
   ],
   "sizing": "Measure the widest part of each nail with a soft tape, or press clear tape across the nail, mark the edges and measure it on a ruler.\n\n- **S**: thumb 15 mm, index 11 mm, middle 12 mm, ring 11 mm, little 8 mm\n- **M**: thumb 16 mm, index 12 mm, middle 13 mm, ring 12 mm, little 9 mm\n- **L**: thumb 17 mm, index 13 mm, middle 14 mm, ring 13 mm, little 10 mm\n\nBetween sizes? Pick the larger one and file the sides to fit. For a custom set, add your ten measurements in the order notes.",
@@ -110,5 +114,95 @@
       "Alcohol wipes"
     ]
   },
-  "sizingImages": []
+  "sizingImages": [],
+  "theme": {
+    "primary": "",
+    "accent": "",
+    "background": ""
+  },
+  "texts": {
+    "home": {
+      "bookButton": "Book a home visit",
+      "shopButton": "Shop press-ons",
+      "servicesTitle": "Nail extensions *at home*",
+      "servicesLink": "Full price list",
+      "shopTitle": "Press-on *drops*",
+      "shopLink": "Shop all",
+      "reviewsTitle": "Kind *words*",
+      "reviewsLink": "All reviews",
+      "blogTitle": "From the *blog*",
+      "blogLink": "All posts",
+      "faqTitle": "Questions, *answered*",
+      "followTitle": "Fresh sets *every week*",
+      "followText": "for new designs, offers and press-on drops.",
+      "followButton": "Follow on Instagram",
+      "areasTitle": "Home visits across {area}"
+    },
+    "steps": [
+      {
+        "title": "Request",
+        "text": "Pick your set, slot and location, add inspo pics."
+      },
+      {
+        "title": "Pay advance",
+        "text": "Scan the UPI QR. Your slot is held right away."
+      },
+      {
+        "title": "We confirm",
+        "text": "We check your inspo and confirm on WhatsApp."
+      },
+      {
+        "title": "Nail day",
+        "text": "We arrive with everything. You relax."
+      }
+    ],
+    "show": {
+      "steps": true,
+      "services": true,
+      "shop": true,
+      "reviews": true,
+      "blog": true,
+      "faq": true,
+      "follow": true,
+      "areas": true
+    },
+    "pages": {
+      "services": {
+        "eyebrow": "Price list",
+        "title": "Services and *prices*",
+        "text": "Every extension is done at your home across {area}. The final price is confirmed on WhatsApp before your visit.",
+        "button": "Book a set"
+      },
+      "shop": {
+        "eyebrow": "Press-on nails",
+        "title": "Press-ons, *made to fit*",
+        "text": "Reusable salon-quality press-on sets, shipped across India."
+      },
+      "reviews": {
+        "eyebrow": "Reviews",
+        "title": "Kind *words*",
+        "text": "What our clients say about their sets."
+      },
+      "blog": {
+        "eyebrow": "Blog",
+        "title": "Nail *notes*",
+        "text": "Care tips, trends and press-on how-tos."
+      },
+      "contact": {
+        "eyebrow": "Contact",
+        "title": "Say *hello*",
+        "text": "We come to you anywhere in {area}. Message us with any question."
+      },
+      "policies": {
+        "eyebrow": "Policies",
+        "title": "The *small print*",
+        "text": ""
+      },
+      "book": {
+        "eyebrow": "Book online",
+        "title": "Book your *set*",
+        "text": "Takes about two minutes. Pay a small advance by UPI to hold your slot, refunded in full if we can't do your set."
+      }
+    }
+  }
 }

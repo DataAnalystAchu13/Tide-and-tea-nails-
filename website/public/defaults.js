@@ -110,6 +110,6 @@ export function priceListHtml(cfg) {
     <div class="card price-card"><h3>Extensions</h3><ul class="plist">${cfg.extensionTypes.map((t) => li(t.name, rupees(t.price), t.description)).join("")}</ul>${lengthNote}</div>
     <div class="card price-card"><h3>Add-ons</h3><ul class="plist">${cfg.addOns.map((a) => li(a.name, addOnPrice(a))).join("")}</ul></div>
     <div class="card price-card visit-card"><h3>Home visits</h3>${travel}
-      <p class="muted">An advance of ${Number(cfg.advancePercent) || 0}% after we approve your request confirms your slot. The balance is paid on the day.</p></div>
+      <p class="muted">An advance of ${Number(cfg.advancePercent) || 0}% paid when you book holds your slot. The balance is paid on the day.</p></div>
   </div>`;
 }

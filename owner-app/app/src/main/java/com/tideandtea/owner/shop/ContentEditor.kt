@@ -2,6 +2,8 @@ package com.tideandtea.owner.shop
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,7 +56,7 @@ sealed interface F {
     val path: String
     data class Text(override val path: String, val label: String, val hint: String? = null, val lines: Int = 1) : F
     data class Num(override val path: String, val label: String, val prefix: String? = null, val hint: String? = null) : F
-    data class Bool(override val path: String, val label: String, val sub: String? = null) : F
+    data class Bool(override val path: String, val label: String, val sub: String? = null, val default: Boolean = false) : F
     data class Image(override val path: String, val label: String) : F
     data class Images(override val path: String, val label: String, val max: Int = 6) : F
     data class Words(override val path: String, val label: String, val hint: String) : F
@@ -68,6 +70,8 @@ sealed interface F {
         val idFromName: Boolean = false,
     ) : F
     data class Note(val text: String) : F { override val path get() = "" }
+    /** A colour stored as "#rrggbb". Empty means the website's own default colour. */
+    data class Color(override val path: String, val label: String, val swatches: List<String>, val sub: String? = null) : F
 }
 
 data class Col(val key: String, val label: String, val num: Boolean = false, val lines: Int = 1, val prefix: String? = null)
@@ -145,7 +149,7 @@ private fun FieldFor(f: F, d: JsonObject, vm: ShopViewModel, folder: String, set
         is F.Text -> Field(f.label, d.at(f.path).text(), { set(f.path, JsonPrimitive(it)) }, hint = f.hint, lines = f.lines)
         is F.Num -> Field(f.label, d.at(f.path).number().takeIf { it != 0L || d.at(f.path) != null }?.toString().orEmpty(),
             { set(f.path, JsonPrimitive(it.toLongOrNull() ?: 0L)) }, number = true, prefix = f.prefix, hint = f.hint)
-        is F.Bool -> ToggleRow(f.label, f.sub, d.at(f.path).flag()) { set(f.path, JsonPrimitive(it)) }
+        is F.Bool -> ToggleRow(f.label, f.sub, d.at(f.path)?.flag() ?: f.default) { set(f.path, JsonPrimitive(it)) }
         is F.Words -> {
             val list = d.at(f.path).strings()
             var text by remember(f.path) { mutableStateOf(list.joinToString(", ")) }
@@ -185,7 +189,43 @@ private fun FieldFor(f: F, d: JsonObject, vm: ShopViewModel, folder: String, set
                 onChange = { set(f.path, JsonArray(it.map(::JsonPrimitive))) })
         }
         is F.Rows -> RowsEditor(f, d.at(f.path).objects()) { rows -> set(f.path, JsonArray(rows)) }
+        is F.Color -> ColorField(f, d.at(f.path).text()) { set(f.path, JsonPrimitive(it)) }
     }
+}
+
+private fun parseHex(s: String): androidx.compose.ui.graphics.Color? =
+    if (Regex("^#[0-9a-fA-F]{6}$").matches(s.trim())) androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(s.trim())) else null
+
+@Composable
+private fun ColorField(f: F.Color, value: String, onChange: (String) -> Unit) {
+    Text(f.label, style = MaterialTheme.typography.titleSmall)
+    if (f.sub != null) Text(f.sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        // First chip: the website's own default.
+        val none = value.isBlank()
+        Box(
+            Modifier.size(40.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                .border(if (none) 3.dp else 1.dp, if (none) Royal else MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                .clickable { onChange("") },
+            contentAlignment = Alignment.Center,
+        ) { Text("Auto", style = MaterialTheme.typography.labelSmall) }
+        f.swatches.forEach { hex ->
+            val c = parseHex(hex) ?: return@forEach
+            val on = value.equals(hex, ignoreCase = true)
+            Box(
+                Modifier.size(40.dp)
+                    .background(c, CircleShape)
+                    .border(if (on) 3.dp else 1.dp, if (on) Royal else MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    .clickable { onChange(hex) },
+            )
+        }
+    }
+    var text by remember(f.path, value) { mutableStateOf(value) }
+    Field("Or type a colour code", text, { v ->
+        text = v
+        if (v.isBlank() || parseHex(v) != null) onChange(v.trim())
+    }, hint = "#3a1d5c")
 }
 
 @Composable

@@ -364,7 +364,7 @@ body.sheet-open { overflow: hidden; }
 .narrow { max-width: 760px; }
 .ico { width: 20px; height: 20px; fill: none; color: currentColor; }
 
-.offer { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--pink); color: var(--plum); font-weight: 800; font-size: .92rem; padding: 8px 16px; text-align: center; }
+.offer { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--pink); color: var(--royal); border-bottom: 1px solid var(--line); font-weight: 800; font-size: .92rem; padding: 8px 16px; text-align: center; }
 .offer a { text-decoration: none; }
 .offer svg { width: 12px; height: 12px; fill: var(--royal); flex: none; }
 
@@ -740,3 +740,96 @@ details.extra[open] > summary::before { content: "−"; }
 details.extra > summary .opt { font-weight: 600; color: var(--muted); }
 details.extra { margin-bottom: 22px; }
 details.extra[open] { padding-bottom: 4px; }
+
+/* =====================================================================
+   Finishing layer: same layout, richer type and softer surfaces.
+   Tall serif caps with handwritten script accents, letterspaced pill
+   buttons, a blush-tinted page and borderless soft cards.
+   ===================================================================== */
+:root {
+  /* White and purple: white page, white accents on purple, purple accents on white. */
+  --mist: #ffffff;
+  --line: #ebe3f2;
+  --pink: #ffffff;
+  --pink-deep: #5b2d8a;
+  --script: "Allura", "Snell Roundhand", cursive;
+  --shadow: 0 1px 2px rgba(58, 29, 92, .04), 0 18px 40px -24px rgba(58, 29, 92, .32);
+}
+h1, h2 { text-transform: uppercase; letter-spacing: .03em; font-weight: 500; }
+h1 em, h2 em { font-family: var(--script); font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0;
+  font-size: 1.3em; line-height: .7; padding: 0 .05em; color: var(--pink-deep); }
+.hero h1 { letter-spacing: .02em; line-height: 1; }
+.hero h1 em { color: var(--pink); }
+.pagehead h1 em, .igband h2 em { color: var(--pink); }
+h3 { letter-spacing: .01em; }
+
+/* Letterspaced pill buttons and nav */
+.btn { text-transform: uppercase; letter-spacing: .12em; font-size: .8rem; font-weight: 800; }
+.btn-sm { font-size: .74rem; }
+.mainnav a { text-transform: uppercase; letter-spacing: .12em; font-size: .76rem; }
+.brand { text-transform: uppercase; letter-spacing: .06em; font-size: 1.25rem; }
+.more { text-transform: uppercase; letter-spacing: .12em; font-size: .76rem; }
+.eyebrow { letter-spacing: .24em; }
+
+/* Softer, borderless cards with a little lift */
+.card { border: 0; box-shadow: var(--shadow); }
+.svc, .review, .postcard, .how li { transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; }
+.svc:hover, .postcard:hover { transform: translateY(-3px); }
+.how li { border: 0; box-shadow: var(--shadow); }
+.pimg { border-radius: var(--r-lg); }
+.review blockquote { font-family: var(--display); font-size: 1.2rem; line-height: 1.4; font-style: italic; }
+.faq details { border: 0; box-shadow: var(--shadow); }
+.area-chip { border: 0; box-shadow: var(--shadow); }
+
+/* Pay box: one clear column of actions on phones */
+@media (max-width: 760px) {
+  .pay-row { display: grid; gap: 10px; width: 100%; }
+  .pay-row .btn { width: 100%; min-height: 50px; }
+}
+
+/* With white accents, keep the light chips and buttons readable */
+.btn-pink { color: var(--royal); }
+.btn-pink:hover { background: #f1eaf8; }
+.badge.sale, .cart-count { background: var(--royal); color: #fff; }
+.site-head .cart-count { background: #fff; color: var(--royal); }
+.date input:checked + span small, .chip input:checked + span i { color: #fff; }
+.stepper li.done::before { background: var(--royal-2); }
+.mybk.hl { box-shadow: 0 0 0 3px var(--royal-2), var(--shadow); }
+.section:nth-of-type(even) .card, .faq details { box-shadow: 0 1px 2px rgba(58,29,92,.05), 0 0 0 1px var(--line), 0 18px 40px -26px rgba(58,29,92,.3); }
+@media (max-width: 760px) {
+  .brand { min-width: 0; font-size: .95rem; letter-spacing: .03em; }
+  .brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* About me: polaroid photo and a handwritten-feel letter */
+.aboutme { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(32px, 6vw, 72px); align-items: start; }
+.polaroid { position: relative; margin: 8px auto 0; width: min(420px, 100%); padding: 14px 14px 18px; background: #fff; border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(58,29,92,.06), 0 30px 60px -30px rgba(58,29,92,.45); transform: rotate(-2.5deg); }
+.polaroid img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; object-position: center 30%; border-radius: 2px; }
+.polaroid figcaption { margin-top: 12px; text-align: center; font: 400 1.9rem/1 var(--script, cursive); color: var(--royal); }
+.polaroid .tape { position: absolute; top: -14px; left: 50%; width: 110px; height: 30px; transform: translateX(-50%) rotate(3deg);
+  background: rgba(236, 226, 246, .85); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.polaroid .bunny { position: absolute; left: -34px; bottom: 54px; width: 84px; height: 92px; transform: rotate(4deg); }
+.polaroid .sp1 { top: 10%; right: -22px; left: auto; }
+.polaroid .sp2 { bottom: -10px; right: 24%; }
+.letter { padding: clamp(24px, 4vw, 44px); }
+.letter .prose p { font-size: 1.08rem; line-height: 1.8; }
+.letter .prose p:first-child::first-letter { font: 500 3.4rem/.8 var(--display); float: left; margin: 6px 10px 0 0; color: var(--royal); }
+.signoff { margin: 22px 0 26px; color: var(--muted); font-weight: 700; }
+.signoff span { display: block; margin-top: 4px; font: 400 2.8rem/1 var(--script, cursive); color: var(--royal); }
+.about-pics.strip { grid-template-columns: repeat(4, 1fr); margin-top: 32px; }
+@media (max-width: 760px) {
+  .aboutme { grid-template-columns: 1fr; }
+  .polaroid { width: min(320px, 86%); }
+  .polaroid .bunny { left: -24px; width: 70px; height: 76px; }
+  .about-pics.strip { grid-template-columns: 1fr 1fr; }
+}
+.section:has(> .aboutme) { overflow-x: clip; }
+.letter .hero-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
+@media (max-width: 760px) {
+  .head-inner { gap: 8px; }
+  .brand { gap: 8px; font-size: .86rem; letter-spacing: .02em; flex: 1 1 auto; }
+  .brand img { width: 34px; height: 34px; }
+  .head-actions { gap: 4px; flex: none; }
+  .head-actions .btn { padding: 0 14px; }
+}
