@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "546804501449",
+    "project_id": "tide-and-tea-nails",
+    "storage_bucket": "tide-and-tea-nails.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:546804501449:android:e9cf524f9bf28056703618",
+        "android_client_info": {
+          "package_name": "com.tideandtea.owner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDV2177WAxgJ_Lon50DO6qfvHRTDnq_5xk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
