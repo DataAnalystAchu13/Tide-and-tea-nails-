@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    // An owner is any signed-in account with a document at owners/{uid}.
+    // Create that document by hand in the Firebase console (see SETUP.md).
+    function isOwner() {
+      return signedIn() && exists(/databases/$(database)/documents/owners/$(request.auth.uid));
+    }
+
+    match /owners/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Price list, slots, studio location, UPI details. Everyone reads, only owners change.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    // Booked time slots per day: { taken: ["10:00", ...] }. No customer details here.
+    match /slots/{date} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    match /bookings/{bookingId} {
+      function mine() { return signedIn() && resource.data.customerUid == request.auth.uid; }
+
+      allow read: if isOwner() || mine();
+
+      // Customers can only create their own booking, always starting as "requested".
+      allow create: if signedIn()
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.status == 'requested'
+        && request.resource.data.name is string && request.resource.data.name.size() <= 100
+        && request.resource.data.phone is string && request.resource.data.phone.size() <= 20
+        && request.resource.data.inspoUrls is list && request.resource.data.inspoUrls.size() >= 1
+        && request.resource.data.inspoUrls.size() <= 10
+        && request.resource.data.naturalUrls.size() <= 5;
+
+      // After approval the customer may only add their UPI reference.
+      allow update: if isOwner() || (
+        mine()
+        && resource.data.status == 'approved'
+        && request.resource.data.status == 'payment_submitted'
+        && request.resource.data.paymentRef is string && request.resource.data.paymentRef.size() <= 40
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'paymentRef', 'paymentSubmittedAt', 'updatedAt'])
+      );
+
+      allow delete: if isOwner();
+    }
+  }
+}

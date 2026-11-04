@@ -1,0 +1,37 @@
+name: Deploy website
+
+# Publishes website/ to Firebase Hosting (and tideandteanails.in once the domain is connected)
+# whenever website files change on main. Needs two repository secrets:
+#   FIREBASE_SERVICE_ACCOUNT  - JSON key of a Firebase service account (see SETUP.md)
+#   FIREBASE_PROJECT_ID       - your Firebase project id
+on:
+  push:
+    branches: [main]
+    paths: ["website/**"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        id: check
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "FIREBASE_SERVICE_ACCOUNT is not set yet, skipping deploy. See SETUP.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        if: steps.check.outputs.ready == 'true'
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          entryPoint: website
+          channelId: live

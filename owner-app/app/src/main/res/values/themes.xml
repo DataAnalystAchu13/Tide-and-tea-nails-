@@ -1,0 +1,8 @@
+<resources>
+    <color name="royal">#FF3A1D5C</color>
+    <style name="Theme.TideOwner" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/royal</item>
+        <item name="android:statusBarColor">@color/royal</item>
+        <item name="android:navigationBarColor">@color/royal</item>
+    </style>
+</resources>
