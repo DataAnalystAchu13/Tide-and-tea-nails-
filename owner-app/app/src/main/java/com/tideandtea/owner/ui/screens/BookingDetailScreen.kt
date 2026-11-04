@@ -150,7 +150,7 @@ fun BookingDetailScreen(
                     val place = b.place
                     if (b.isHomeVisit && place != null) {
                         Text(place.address.ifBlank { "Pinned on map" }, style = MaterialTheme.typography.bodyLarge)
-                        Text("About ${"%.1f".format(b.distanceKm)} km from the studio · travel ${money(b.price.travel)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("About ${"%.1f".format(b.distanceKm)} km from the studio · " + if (b.price.travel > 0) "travel ${money(b.price.travel)}" else "set the travel charge when you approve", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(onClick = { ctx.open(place.mapsUrl) }, modifier = Modifier.weight(1f)) {
                                 Icon(Icons.Outlined.Map, null, Modifier.size(18.dp)); Text("  Open in Maps")
@@ -195,7 +195,13 @@ fun BookingDetailScreen(
                     InfoRow(b.extension?.name ?: "Extension", money(b.price.base))
                     if (b.price.length > 0) InfoRow("Length", money(b.price.length))
                     if (b.price.addOns > 0) InfoRow("Add-ons", money(b.price.addOns))
-                    InfoRow("Travel", if (b.price.travel > 0) money(b.price.travel) else "Free")
+                    val varies = b.addOns.filter { it.price <= 0 }
+                    if (varies.isNotEmpty()) InfoRow("Price varies", varies.joinToString { it.name })
+                    InfoRow("Travel", when {
+                        !b.isHomeVisit -> "Studio visit"
+                        b.price.travel > 0 -> money(b.price.travel)
+                        else -> "To confirm"
+                    })
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     InfoRow("Total", money(b.price.total), strong = true)
                     InfoRow("Advance", money(b.price.advance), strong = true, valueColor = PinkDeep)
@@ -256,7 +262,7 @@ private fun Actions(b: Booking, vm: OwnerViewModel) {
             var advance by rememberSaveable(b.id) { mutableStateOf(b.price.advance.toString()) }
             var note by rememberSaveable(b.id) { mutableStateOf("") }
             Section("Review") {
-                Text("Adjust the price if needed, add a note for the client, then approve. They'll see the advance to pay on the website.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Adjust the price if needed (add the travel charge and any \"price varies\" add-ons to the total), add a note for the client, then approve. They'll see the advance to pay on the website.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(total, { total = it.filter(Char::isDigit) }, label = { Text("Total ₹") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))

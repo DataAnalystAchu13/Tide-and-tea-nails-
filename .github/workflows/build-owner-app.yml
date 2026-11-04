@@ -1,0 +1,76 @@
+name: Build owner app
+
+# Builds the Android owner app (owner-app/) into an APK you can install on the owner's phone.
+# Download it from this workflow run's page, under "Artifacts" > tide-and-tea-owner-apk.
+#
+# Runs when:
+#   - owner app code changes land on main
+#   - by hand from the Actions tab (Build owner app > Run workflow)
+#
+# Needs google-services.json from Firebase (Project settings > Your apps > Android app
+# com.tideandtea.owner). Either save its full text as the repository secret GOOGLE_SERVICES_JSON,
+# or commit it at owner-app/app/google-services.json.
+on:
+  push:
+    branches: [main]
+    paths: ["owner-app/**", ".github/workflows/build-owner-app.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-owner-app
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: owner-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          fi
+          if [ ! -s app/google-services.json ]; then
+            echo "::error::google-services.json is missing. Add it as the GOOGLE_SERVICES_JSON repository secret (see the top of this workflow)."
+            exit 1
+          fi
+          python3 -c "import json,sys; d=json.load(open('app/google-services.json')); ids=[c['client_info']['android_client_info']['package_name'] for c in d['client']]; sys.exit(0 if 'com.tideandtea.owner' in ids else 'google-services.json has no Android app with package com.tideandtea.owner (found: %s)' % ids)"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Keep the same signing key between builds so a new APK installs over the old one.
+      - name: Restore signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: owner-app-debug-keystore-v1
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Name the APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk "out/tide-and-tea-owner-$(date -u +%Y%m%d)-${GITHUB_SHA::7}.apk"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tide-and-tea-owner-apk
+          path: owner-app/out/*.apk
+          retention-days: 30
+          if-no-files-found: error

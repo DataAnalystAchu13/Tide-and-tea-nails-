@@ -1,6 +1,7 @@
 // Page templates for the static site. Every value from Firestore goes through esc() or md().
 import { esc, md, plain } from "./md.mjs";
 import { displayPrice, saleActive } from "../../supabase/functions/_shared/pricing.mjs";
+import { priceListHtml } from "../public/defaults.js";
 
 const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <symbol id="sparkle" viewBox="0 0 24 24"><path d="M12 0c.6 6.3 5.7 11.4 12 12-6.3.6-11.4 5.7-12 12-.6-6.3-5.7-11.4-12-12C6.3 11.4 11.4 6.3 12 0z"/></symbol>
@@ -12,7 +13,7 @@ const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden=
 </defs></svg>`;
 
 const NAV = [
-  ["/book/", "Book"],
+  ["/book/#book", "Book"],
   ["/services/", "Services"],
   ["/shop/", "Shop"],
   ["/reviews/", "Reviews"],
@@ -49,6 +50,9 @@ function contactLinks(c) {
   };
 }
 
+/** Where home visits go, e.g. "Chennai and Chengalpattu". */
+const serviceArea = (c) => c.site.contact.serviceArea || c.site.contact.city || "Chennai";
+
 function addressLine(c) {
   const k = c.site.contact;
   if (!k.address && !k.area) return "";
@@ -80,7 +84,7 @@ function salonLd(c) {
       ...(k.pincode ? { postalCode: k.pincode } : {}),
       addressCountry: "IN",
     },
-    areaServed: [{ "@type": "City", name: "Chennai" }, ...c.areas.map((a) => ({ "@type": "Place", name: `${a.name}, Chennai` }))],
+    areaServed: c.areas.length ? c.areas.map((a) => ({ "@type": "City", name: a.name })) : [{ "@type": "City", name: "Chennai" }],
     sameAs: [L.igUrl, k.googleProfileUrl].filter(Boolean),
     hasOfferCatalog: {
       "@type": "OfferCatalog",
@@ -117,14 +121,14 @@ function offerStrip(c) {
 }
 
 function header(c, path) {
-  const link = ([href, label]) => `<a href="${href}"${path.startsWith(href) ? ' aria-current="page"' : ""}>${label}</a>`;
+  const link = ([href, label]) => `<a href="${href}"${path.startsWith(href.split("#")[0]) ? ' aria-current="page"' : ""}>${label}</a>`;
   return `<header class="site-head">
   <div class="wrap head-inner">
     <a class="brand" href="/"><img src="/logo.webp" alt="" width="40" height="40"><span>${esc(c.site.brand.name.replace(/ Nails$/, ""))}</span></a>
-    <nav class="mainnav" aria-label="Main">${NAV.filter(([h]) => h !== "/book/").map(link).join("")}</nav>
+    <nav class="mainnav" aria-label="Main">${NAV.filter(([h]) => !h.startsWith("/book/")).map(link).join("")}</nav>
     <div class="head-actions">
       <a class="cart-link" href="/cart/" aria-label="Cart"><svg aria-hidden="true"><use href="#i-bag"/></svg><span class="cart-count" data-cart-count hidden>0</span></a>
-      <a class="btn btn-pink btn-sm" href="/book/">Book</a>
+      <a class="btn btn-pink btn-sm" href="/book/#book">Book</a>
       <details class="menu">
         <summary aria-label="Menu"><span></span><span></span><span></span></summary>
         <nav class="menu-panel" aria-label="Mobile">${NAV.map(link).join("")}<a href="/orders/">My orders</a></nav>
@@ -149,7 +153,7 @@ function footer(c) {
     <div>
       <h2 class="foot-h">Visit or call</h2>
       <address>
-        ${k.homeVisitsOnly ? `Home visits across ${esc(k.city || "Chennai")}<br>` : ""}${addressLine(c) ? esc(addressLine(c)) + "<br>" : ""}
+        ${k.homeVisitsOnly ? `Home visits across ${esc(serviceArea(c))}<br>` : ""}${addressLine(c) ? esc(addressLine(c)) + "<br>" : ""}
         ${L.tel ? `<a href="${L.tel}">${esc(k.phone)}</a><br>` : ""}${k.email ? `<a href="${esc(L.mail)}">${esc(k.email)}</a>` : ""}
       </address>
       ${hours ? `<ul class="hours">${hours}</ul>` : ""}
@@ -269,26 +273,36 @@ function prettyDate(d) {
   return new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
 }
 
+/** What comes in every press-on order. */
+function kitList(c, cls = "") {
+  const k = c.site.kit || {};
+  const items = (k.items || []).filter(Boolean);
+  if (!items.length) return "";
+  return `<div class="kit ${cls}"><h3>${esc(k.title || "In every press-on order")}</h3><ul>${items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul></div>`;
+}
+
+/** Sizing guide and how-to-apply pictures, with the written guide and an order button. */
+function sizingSection(c) {
+  const captions = ["Nail sizing guide", "How to apply press-on nails"];
+  const pics = (c.site.sizingImages || []).map((x, i) => (typeof x === "string" ? { src: x, caption: captions[i] || "" } : x)).filter((x) => x && x.src);
+  return `<section class="section sizing-sec" id="sizing"><div class="wrap">
+  <div class="sec-head"><h2>Sizing and how to apply</h2><a class="more" href="/shop/#pgrid">Order press-ons</a></div>
+  ${pics.length ? `<div class="guide-grid">${pics.map((p) => `<figure class="guide card"><a href="${esc(p.src)}" target="_blank" rel="noopener">${img(p.src, p.alt || p.caption || "Guide")}</a>${p.caption ? `<figcaption>${esc(p.caption)}</figcaption>` : ""}</figure>`).join("")}</div>` : ""}
+  <div class="guide-foot">
+    <div class="card guide-text"><h3>Find your size</h3><div class="prose">${md(c.site.sizing)}</div><a class="btn btn-primary" href="/shop/#pgrid">Order press-ons</a></div>
+    ${kitList(c, "card")}
+  </div>
+</div></section>`;
+}
+
 function priceGrid(c) {
-  const cfg = c.config;
-  const li = (name, amt, sub = "") => `<li><span>${esc(name)}</span><span class="amt">${amt}</span>${sub ? `<small>${esc(sub)}</small>` : ""}</li>`;
-  const slabs = [...cfg.travel.slabs].sort((a, b) => a.upToKm - b.upToKm);
-  let prev = 0;
-  const travel = slabs.map((s) => { const r = li(`${prev} to ${s.upToKm} km`, s.charge ? money(s.charge) : "Free"); prev = s.upToKm; return r; }).join("")
-    + li(`Beyond ${prev} km`, `+${money(cfg.travel.perKmBeyond)}/km`);
-  return `<div class="price-grid">
-    <div class="card price-card"><h3>Extensions</h3><ul class="plist">${cfg.extensionTypes.map((t) => li(t.name, money(t.price), t.description)).join("")}</ul></div>
-    <div class="card price-card"><h3>Length</h3><ul class="plist">${cfg.lengths.map((l) => li(l.name, l.price ? "+" + money(l.price) : "Included")).join("")}</ul>
-      <h3 class="mt">Add-ons</h3><ul class="plist">${cfg.addOns.map((a) => li(a.name, "+" + money(a.price))).join("")}</ul></div>
-    <div class="card price-card"><h3>Home visit travel</h3><ul class="plist">${travel}</ul>
-      <p class="muted small">An advance of ${cfg.advancePercent}% after we approve your request confirms your slot. The balance is paid on the day.</p></div>
-  </div>`;
+  return priceListHtml(c.config);
 }
 
 function faqBlock(c) {
   const f = (c.site.faq || []).filter((x) => x && x.q && x.a);
   if (!f.length) return "";
-  return `<section class="section"><div class="wrap narrow">
+  return `<section class="section"><div class="wrap">
   <h2>Questions, answered</h2>
   <div class="faq">${f.map((x) => `<details><summary>${esc(x.q)}</summary><div>${md(x.a)}</div></details>`).join("")}</div>
 </div></section>`;
@@ -314,11 +328,13 @@ const scriptsFor = (...names) => names.map((n) => `<script type="module" src="/$
 
 export function home(c, now) {
   const h = c.site.home;
-  const featured = c.products.filter((p) => p.featured).slice(0, 4);
-  const shopPicks = featured.length ? featured : c.products.slice(0, 4);
+  // Featured sets first, topped up with the rest, in an even count so rows never end half empty.
+  const ordered = [...c.products.filter((p) => p.featured), ...c.products.filter((p) => !p.featured)].slice(0, 4);
+  const shopPicks = ordered.length > 1 ? ordered.slice(0, ordered.length - (ordered.length % 2)) : ordered;
   const reviews = c.reviews.filter((r) => r.featured).slice(0, 3);
   const showReviews = reviews.length ? reviews : c.reviews.slice(0, 3);
-  const from = Math.min(...c.config.extensionTypes.map((t) => t.price));
+  const homeSets = c.config.extensionTypes.filter((t) => t.id !== "pressons" && Number(t.price) > 0);
+  const from = Math.min(...(homeSets.length ? homeSets : c.config.extensionTypes).map((t) => t.price));
   const k = c.site.contact;
   const body = `
 <section class="hero home-hero">
@@ -329,10 +345,10 @@ export function home(c, now) {
         <h1>${rich(h.title)}</h1>
         <p class="lede">${esc(h.text)}</p>
         <div class="hero-cta">
-          <a class="btn btn-pink" href="/book/">Book a home visit</a>
+          <a class="btn btn-pink" href="/book/#book">Book a home visit</a>
           <a class="btn btn-ghost" href="/shop/">Shop press-ons</a>
         </div>
-        <p class="hero-note">Sets from ${money(from)} · serving ${esc(k.city || "Chennai")}${c.areas.length ? ` · ${c.areas.slice(0, 3).map((a) => esc(a.name)).join(", ")} and more` : ""}</p>
+        <p class="hero-note">Sets from ${money(from)} · home visits across ${esc(serviceArea(c))} · open ${esc((k.hours || [])[0]?.days || "every day")}</p>
       </div>
       <div class="hero-art${h.heroImage ? " has-photo" : ""}" aria-hidden="true">
         ${h.heroImage ? img(h.heroImage, "", "hero-photo", true) : `<img class="logo-badge" src="/logo.webp" alt="" width="320" height="320" fetchpriority="high">`}
@@ -354,7 +370,7 @@ export function home(c, now) {
 
 <section class="section"><div class="wrap">
   <div class="sec-head"><h2>Nail extensions at home</h2><a class="more" href="/services/">Full price list</a></div>
-  <div class="svc-grid">${c.config.extensionTypes.slice(0, 6).map((t) => `<a class="svc card" href="/book/"><h3>${esc(t.name)}</h3><p>${esc(t.description || "")}</p><span class="svc-price">from ${money(t.price)}</span></a>`).join("")}</div>
+  <div class="svc-grid">${c.config.extensionTypes.slice(0, 6).map((t) => `<a class="svc card" href="/book/#book"><h3>${esc(t.name)}</h3><p>${esc(t.description || "")}</p><span class="svc-price">from ${money(t.price)}</span></a>`).join("")}</div>
 </div></section>
 
 ${shopPicks.length ? `<section class="section"><div class="wrap">
@@ -376,7 +392,7 @@ ${c.posts.length ? `<section class="section"><div class="wrap">
 ${faqBlock(c)}
 ${followBand(c)}
 ${c.areas.length ? `<section class="section areas-sec"><div class="wrap">
-  <h2>Home visits across Chennai</h2>
+  <h2>Home visits across ${esc(serviceArea(c))}</h2>
   <div class="area-chips">${c.areas.map((a) => `<a class="area-chip" href="/nail-extensions-in-${a.slug}/">${esc(a.name)}</a>`).join("")}</div>
 </div></section>` : ""}`;
   return {
@@ -394,7 +410,7 @@ ${c.areas.length ? `<section class="section areas-sec"><div class="wrap">
 }
 
 export function services(c) {
-  const body = `${pageHead("Price list", "Services and *prices*", `Every extension is done at your home in ${c.site.contact.city || "Chennai"}. Final price is confirmed when we approve your request.`, `<div class="hero-cta"><a class="btn btn-pink" href="/book/">Book a set</a></div>`)}
+  const body = `${pageHead("Price list", "Services and *prices*", `Every extension is done at your home across ${serviceArea(c)}. Final price is confirmed when we approve your request.`, `<div class="hero-cta"><a class="btn btn-pink" href="/book/#book">Book a set</a></div>`)}
 <section class="section"><div class="wrap">${priceGrid(c)}</div></section>
 ${faqBlock(c)}`;
   return {
@@ -422,8 +438,8 @@ export function shop(c, now) {
   </div>
   <div class="pgrid" id="pgrid">${c.products.map((p) => productCard(c, p, now)).join("")}</div>
   <p class="muted center" id="noMatch" hidden>No sets match those filters.</p>` : `<div class="empty card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><h2>New sets dropping soon</h2><p>Follow us on Instagram to hear first.</p></div>`}
-  <details class="sizing card"><summary>Sizing guide</summary><div class="prose">${md(c.site.sizing)}</div></details>
-</div></section>`;
+</div></section>
+${sizingSection(c)}`;
   return {
     path: "/shop/",
     html: layout(c, {
@@ -464,7 +480,7 @@ export function product(c, p, now) {
       ${(p.shape && p.shape !== "Any") || (p.length && p.length !== "Any") ? `<dl class="specs">${p.shape && p.shape !== "Any" ? `<div><dt>Shape</dt><dd>${esc(p.shape)}</dd></div>` : ""}${p.length && p.length !== "Any" ? `<div><dt>Length</dt><dd>${esc(p.length)}</dd></div>` : ""}</dl>` : ""}
       <form class="buy" id="buyForm" data-product='${esc(JSON.stringify({ id: p.id, slug: p.slug, name: p.name, image: images[0] || "", price: p.price, salePrice: p.salePrice || 0, stock: p.stock || 0, madeToOrder: !!p.madeToOrder, sizes: p.sizes || [] }))}'>
         ${(p.sizes || []).length ? `<fieldset class="group"><legend class="label">Size</legend><div class="chips">${p.sizes.map((s, i) => `<label class="chip"><input type="radio" name="size" value="${esc(s)}"${i === 0 ? " required" : ""}><span>${esc(s)}</span></label>`).join("")}</div>
-          <details class="sizing-mini"><summary>Which size am I?</summary><div class="prose">${md(c.site.sizing)}</div></details></fieldset>` : ""}
+          <details class="sizing-mini"><summary>Which size am I?</summary><div class="prose">${md(c.site.sizing)}</div><a href="/shop/#sizing">See the picture guide</a></details></fieldset>` : ""}
         <div class="buy-row">
           <label class="qty"><span class="sr">Quantity</span><button type="button" data-step="-1" aria-label="One less">−</button><input name="qty" type="number" min="1" max="10" value="1" inputmode="numeric"><button type="button" data-step="1" aria-label="One more">+</button></label>
           <button class="btn btn-primary grow" type="submit" ${sold ? "disabled" : ""} data-add>${sold ? "Sold out" : "Add to bag"}</button>
@@ -474,7 +490,8 @@ export function product(c, p, now) {
       <ul class="perks">
         <li>${ship.freeAbove ? `Free shipping over ${money(ship.freeAbove)}, otherwise ${money(ship.flat)}` : `Shipping ${money(ship.flat)}`}</li>
         <li>${esc(ship.days)}</li>
-        <li>Each set includes glue tabs, a mini file and a cuticle pusher</li>
+        <li>Free kit in every order: ${esc(((c.site.kit || {}).items || []).join(", ").toLowerCase().replace(/, ([^,]*)$/, " and $1"))}</li>
+        <li><a href="/shop/#sizing">Sizing guide and how to apply</a></li>
       </ul>
     </div>
   </div>
@@ -601,7 +618,7 @@ export function post(c, p) {
   <header class="post-head"><time datetime="${esc(date)}">${esc(prettyDate(p.publishedAt))}</time><h1>${esc(p.title)}</h1></header>
   ${p.cover ? `<div class="post-hero">${img(p.cover, p.title, "", true)}</div>` : ""}
   <div class="prose">${md(p.body)}</div>
-  <div class="post-cta card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><div><h2>Ready for a new set?</h2><p>Book a home visit or browse press-ons.</p></div><div class="hero-cta"><a class="btn btn-primary" href="/book/">Book</a><a class="btn btn-quiet" href="/shop/">Shop</a></div></div>
+  <div class="post-cta card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><div><h2>Ready for a new set?</h2><p>Book a home visit or browse press-ons.</p></div><div class="hero-cta"><a class="btn btn-primary" href="/book/#book">Book</a><a class="btn btn-quiet" href="/shop/">Shop</a></div></div>
 </div></article>`;
   return {
     path,
@@ -630,7 +647,7 @@ export function contact(c) {
     L.igUrl && `<a class="crow card" href="${esc(L.igUrl)}" rel="noopener" target="_blank"><b>Instagram</b><span>@${esc(L.ig)}</span></a>`,
   ].filter(Boolean).join("");
   const hours = (k.hours || []).filter((h) => h && h.days).map((h) => `<li><span>${esc(h.days)}</span><span>${esc(h.time)}</span></li>`).join("");
-  const body = `${pageHead("Contact", "Say *hello*", k.homeVisitsOnly ? `We come to you, anywhere in ${k.city || "Chennai"}. Message us with any question.` : "Visit the studio or message us with any question.")}
+  const body = `${pageHead("Contact", "Say *hello*", k.homeVisitsOnly ? `We come to you anywhere in ${serviceArea(c)}. Message us with any question.` : "Visit the studio or message us with any question.")}
 <section class="section"><div class="wrap contact">
   <div class="contact-list">${rows || `<p class="muted">Contact details coming soon.</p>`}
     ${hours ? `<div class="card hours-card"><h3>Hours</h3><ul class="hours">${hours}</ul></div>` : ""}
@@ -648,10 +665,10 @@ export function area(c, a, now) {
   const path = `/nail-extensions-in-${a.slug}/`;
   const others = c.areas.filter((x) => x.slug !== a.slug);
   const picks = c.products.filter((p) => p.featured).slice(0, 4);
-  const body = `${pageHead(`Home visits · ${a.name}`, `Nail extensions in *${a.name}*`, "", `<div class="hero-cta"><a class="btn btn-pink" href="/book/">Book a home visit</a><a class="btn btn-ghost" href="/services/">See prices</a></div>`)}
+  const body = `${pageHead(`Home visits · ${a.name}`, `Nail extensions in *${a.name}*`, "", `<div class="hero-cta"><a class="btn btn-pink" href="/book/#book">Book a home visit</a><a class="btn btn-ghost" href="/services/">See prices</a></div>`)}
 <section class="section"><div class="wrap narrow">
   <div class="prose">${md(a.text)}
-  <p>The travel charge to ${esc(a.name)} is worked out from your exact location when you book, and you see it before you send your request.</p></div>
+  <p>${esc(c.config.travel.slabs?.length ? `The travel charge to ${a.name} is worked out from your exact location when you book, and you see it before you send your request.` : c.config.travel.note)}</p></div>
 </div></section>
 <section class="section"><div class="wrap">${priceGrid(c)}</div></section>
 ${picks.length ? `<section class="section"><div class="wrap"><div class="sec-head"><h2>Prefer press-ons?</h2><a class="more" href="/shop/">Shop all</a></div><div class="pgrid">${picks.map((p) => productCard(c, p, now)).join("")}</div></div></section>` : ""}
@@ -661,8 +678,8 @@ ${others.length ? `<section class="section areas-sec"><div class="wrap"><h2>We a
     path,
     html: layout(c, {
       path,
-      title: `Nail Extensions in ${a.name}, Chennai | Home Visits`,
-      description: plain(`Nail extensions at home in ${a.name}, Chennai. ${a.text}`, 155),
+      title: `Nail Extensions at Home in ${a.name} | Home Visits`,
+      description: plain(`Nail extensions at home in ${a.name}. ${a.text}`, 155),
       body,
       jsonld: [ldSalon, crumbs(c, [["Home", "/"], [`Nail extensions in ${a.name}`, path]])],
     }),
@@ -684,13 +701,13 @@ export function policies(c) {
 
 export function book(c, partial) {
   const body = `${pageHead("Book online", "Book your *set*", "Takes about two minutes. Nothing is charged until we approve your request.", `<div class="hero-cta"><a class="btn btn-ghost btn-sm" href="#mine" id="navMine" hidden>My bookings</a><a class="btn btn-ghost btn-sm" href="#prices">Price list</a></div>`)}
-${partial}`;
+${partial.replace('id="book"', `id="book" data-area="${esc(serviceArea(c))}"`)}`;
   return {
     path: "/book/",
     html: layout(c, {
       path: "/book/",
-      title: `Book Nail Extensions at Home in ${c.site.contact.city || "Chennai"}`,
-      description: `Book Gel-X, acrylic, PolyGel or BIAB nail extensions at home in Chennai. Share your inspo, pick a slot and see the price before you send.`,
+      title: `Book Nail Extensions at Home in ${serviceArea(c)}`,
+      description: `Book soft gel, acrylic, PolyGel or gel overlay nail extensions at home in ${serviceArea(c)}. Share your inspo, pick a slot and see the price before you send.`,
       bodyClass: "is-book",
       body,
       scripts: `<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>\n<script type="module" src="/app.js"></script>`,
@@ -744,7 +761,7 @@ export function hi(c) {
 }
 
 export function notFound(c) {
-  const body = `<section class="section"><div class="wrap narrow"><div class="empty card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><h1>This page hopped away</h1><p>Try the home page, the shop or book a set.</p><div class="hero-cta center"><a class="btn btn-primary" href="/">Home</a><a class="btn btn-quiet" href="/shop/">Shop</a><a class="btn btn-quiet" href="/book/">Book</a></div></div></div></section>`;
+  const body = `<section class="section"><div class="wrap narrow"><div class="empty card"><svg class="bunny" aria-hidden="true"><use href="#bunny"/></svg><h1>This page hopped away</h1><p>Try the home page, the shop or book a set.</p><div class="hero-cta center"><a class="btn btn-primary" href="/">Home</a><a class="btn btn-quiet" href="/shop/">Shop</a><a class="btn btn-quiet" href="/book/#book">Book</a></div></div></div></section>`;
   return { path: "/404.html", html: layout(c, { path: "/404.html", title: "Page not found", description: "Page not found.", noindex: true, body }) };
 }
 
