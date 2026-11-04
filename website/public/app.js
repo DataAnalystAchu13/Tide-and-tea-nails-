@@ -578,7 +578,7 @@ function stepFinish() {
   const extras = Boolean(draft.natural.length || draft.instagram || draft.notes);
   return `
   <h3 class="step-title">Your inspo and number</h3>
-  <p class="step-sub">We look at your inspo, then confirm the price on WhatsApp. Nothing is charged now.</p>
+  <p class="step-sub">After this you can pay a small advance to hold your slot. We check your inspo and confirm on WhatsApp.</p>
   <div class="group">
     <span class="label">Inspo pictures</span>
     <label class="drop" data-kind="inspo"><input type="file" accept="image/*" multiple data-kind="inspo">
@@ -722,7 +722,7 @@ async function submit() {
     const sent = { ...draft, q };
     draft = freshDraft(); step = 0;
     try { sessionStorage.removeItem("tide.draft"); } catch {}
-    showSuccess(sent);
+    showSuccess(sent, id);
   } catch (err) {
     console.error(err);
     showError("We couldn't send your request. Check your connection and try again. Your details are still here.");
@@ -731,16 +731,18 @@ async function submit() {
   }
 }
 
-function showSuccess(sent) {
+function showSuccess(sent, id) {
   $("#stepper").innerHTML = "";
   $("#stepBody").innerHTML = `
   <div class="success">
     <svg class="bunny bunny-hop" aria-hidden="true"><use href="#bunny"/></svg>
-    <h3 class="step-title">Request sent!</h3>
-    <p>Thank you, ${esc(sent.name)}. We'll look at your inspo and get back to you on WhatsApp. Once approved, you'll pay an advance of <b>${money(sent.q.advance)}</b> right here to lock in ${esc(prettyDate(sent.date))} at ${esc(sent.slot)}.</p>
+    <h3 class="step-title">Request sent! One last thing</h3>
+    <p>Thank you, ${esc(sent.name)}. Pay the advance now to hold ${esc(prettyDate(sent.date))} at ${esc(slotLabel(sent.slot))} for you. We'll check your inspo and confirm on WhatsApp.</p>
+    ${payBlock({ id, status: "requested", price: sent.q })}
     <a class="btn btn-quiet" href="#mine">See my bookings</a>
   </div>`;
   $(".step-foot").hidden = true;
+  drawQrs();
   $("#book").scrollIntoView({ behavior: "smooth" });
 }
 
@@ -749,9 +751,9 @@ function showSuccess(sent) {
 /* ------------------------------------------------------------------ */
 
 const STATUS = {
-  requested: "Waiting for review",
+  requested: "Pay advance to hold your slot",
   approved: "Approved · pay advance",
-  payment_submitted: "Checking your payment",
+  payment_submitted: "Slot held · checking payment",
   confirmed: "Confirmed",
   completed: "Done",
   declined: "Not available",
@@ -772,6 +774,51 @@ function waLink(b) {
   return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
 }
 
+/** UPI QR, pay button and the box for the transaction ID. Works for 'requested' and 'approved'. */
+function payBlock(b) {
+  const price = b.price || {};
+  const approved = b.status === "approved";
+  return `
+  <div class="pay">
+    <div class="qr" hidden data-qr="${esc(upiLink(b))}" aria-label="UPI QR code for ${money(price.advance)}"></div>
+    <div class="pay-body">
+      <div><b>Pay ${money(price.advance)} advance</b> to ${approved ? "confirm" : "hold"} your slot. Balance ${money((price.total || 0) - (price.advance || 0))} is paid on the day.</div>
+      ${approved ? "" : `<div class="muted small">Scan the QR with any UPI app, or tap the button on your phone. If we can't do your set, we refund the advance in full.</div>`}
+      <div class="pay-row"><a class="btn btn-primary btn-sm" href="${esc(upiLink(b))}">Pay with UPI app</a></div>
+      <div class="upi">UPI ID: ${esc(cfg.upiId)} <button type="button" class="linkbtn" data-copy="${esc(cfg.upiId)}">Copy</button></div>
+      <div class="pay-row" data-pay="${esc(b.id)}">
+        <input name="ref" placeholder="UPI transaction ID (12 digits)" inputmode="numeric" aria-label="UPI transaction ID">
+        <button type="button" class="btn btn-pink btn-sm" data-paid>I've paid</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/** Draws QR codes once the QR library has loaded (it loads with defer, so retry briefly). */
+function drawQrs(tries = 0) {
+  if (!window.QRCode) { if (tries < 20) setTimeout(() => drawQrs(tries + 1), 250); return; }
+  document.querySelectorAll("[data-qr]").forEach((el) => {
+    if (!el.dataset.done) {
+      new window.QRCode(el, { text: el.dataset.qr, width: 240, height: 240, colorDark: "#241238", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
+      el.dataset.done = "1";
+      el.hidden = false;
+    }
+  });
+}
+
+async function sendPaid(btn) {
+  const box = btn.closest("[data-pay]"); if (!box) return;
+  const ref = box.querySelector("input[name=ref]").value.trim();
+  if (ref.replace(/\D/g, "").length < 6) { toast("Enter the transaction ID from your UPI app."); return; }
+  btn.disabled = true;
+  try {
+    await backend.submitPayment(box.dataset.pay, ref);
+    toast("Thanks! Your slot is held. We'll confirm on WhatsApp shortly.");
+    const succ = btn.closest(".success");
+    if (succ) succ.querySelector(".pay").outerHTML = `<div class="note">Payment reference <b>${esc(ref)}</b> received. Your slot is held, and we'll confirm on WhatsApp shortly.</div>`;
+  } catch (err) { console.error(err); toast("Couldn't save that. Try again."); btn.disabled = false; }
+}
+
 function renderMine(list) {
   myBookings = list;
   const sec = $("#mine");
@@ -780,22 +827,10 @@ function renderMine(list) {
     const st = b.status || "requested";
     const price = b.price || {};
     let action = "";
-    if (st === "approved") {
-      action = `
-      <div class="pay">
-        <div class="qr" hidden data-qr="${esc(upiLink(b))}" aria-label="UPI QR code"></div>
-        <div class="pay-body">
-          <div><b>Pay ${money(price.advance)} advance</b> to confirm your slot. Balance ${money((price.total || 0) - (price.advance || 0))} is paid on the day.</div>
-          <div class="pay-row"><a class="btn btn-primary btn-sm" href="${esc(upiLink(b))}">Pay with UPI app</a></div>
-          <div class="upi">UPI ID: ${esc(cfg.upiId)} <button type="button" class="linkbtn" data-copy="${esc(cfg.upiId)}">Copy</button></div>
-          <form class="pay-row" data-pay="${esc(b.id)}">
-            <input name="ref" placeholder="UPI transaction ID (12 digits)" inputmode="numeric" aria-label="UPI transaction ID" required>
-            <button class="btn btn-pink btn-sm">I've paid</button>
-          </form>
-        </div>
-      </div>`;
+    if (st === "requested" || st === "approved") {
+      action = payBlock(b);
     } else if (st === "payment_submitted") {
-      action = `<div class="note">We received your payment reference <b>${esc(b.paymentRef || "")}</b> and will confirm shortly.</div>`;
+      action = `<div class="note">We received your payment reference <b>${esc(b.paymentRef || "")}</b>. Your slot is held, and we'll confirm shortly.</div>`;
     } else if (st === "confirmed") {
       action = `<div class="note">You're booked! ${b.serviceMode === "home" ? "We'll arrive at your address" : "See you at the studio"} at ${esc(b.slot)}.</div>`;
     } else if (st === "declined") {
@@ -804,7 +839,7 @@ function renderMine(list) {
     const note = b.ownerNote && st !== "declined" ? `<div class="note"><b>From Tide & Tea:</b> ${esc(b.ownerNote)}</div>` : "";
     const wa = waLink(b);
     const chatBtn = wa ? `<div class="pay-row"><a class="btn btn-quiet btn-sm" href="${esc(wa)}" target="_blank" rel="noopener">Message us on WhatsApp</a></div>` : "";
-    const demo = PREVIEW && st === "requested" ? `<div class="demo-tools">Preview: <button type="button" class="linkbtn" data-demo-approve="${esc(b.id)}">approve as the owner</button> to see the payment step.</div>` : "";
+    const demo = "";
     return `
     <article class="card mybk">
       <div class="mybk-top"><h3>${esc(b.extension?.name || "Nail set")}${b.length ? ` · ${esc(b.length.name)}` : ""}</h3><span class="pill st-${esc(st)}">${esc(STATUS[st] || st)}</span></div>
@@ -812,13 +847,7 @@ function renderMine(list) {
       ${note}${action}${chatBtn}${demo}
     </article>`;
   }).join("");
-  document.querySelectorAll("[data-qr]").forEach((el) => {
-    if (window.QRCode && !el.dataset.done) {
-      new window.QRCode(el, { text: el.dataset.qr, width: 240, height: 240, colorDark: "#241238", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
-      el.dataset.done = "1";
-      el.hidden = false;
-    }
-  });
+  drawQrs();
 }
 
 /* ------------------------------------------------------------------ */
@@ -868,16 +897,10 @@ function bind() {
   form.addEventListener("dragleave", (e) => { const d = e.target.closest(".drop"); if (d) d.classList.remove("drag"); });
   form.addEventListener("drop", (e) => { const d = e.target.closest(".drop"); if (d) { e.preventDefault(); d.classList.remove("drag"); addFiles(d.dataset.kind, e.dataTransfer.files); } });
 
-  $("#myBookings").addEventListener("submit", async (e) => {
-    const f = e.target.closest("[data-pay]"); if (!f) return;
-    e.preventDefault();
-    const ref = f.ref.value.trim();
-    if (ref.replace(/\D/g, "").length < 6) { toast("Enter the transaction ID from your UPI app."); return; }
-    f.querySelector("button").disabled = true;
-    try { await backend.submitPayment(f.dataset.pay, ref); toast("Thanks! We'll confirm your payment shortly."); }
-    catch (err) { console.error(err); toast("Couldn't save that. Try again."); f.querySelector("button").disabled = false; }
-  });
-  $("#myBookings").addEventListener("click", async (e) => {
+  // Pay boxes live in My bookings and on the success screen, so listen on the whole page.
+  document.addEventListener("click", async (e) => {
+    const paid = e.target.closest("[data-paid]");
+    if (paid) { e.preventDefault(); sendPaid(paid); return; }
     const c = e.target.closest("[data-copy]");
     if (c) { try { await navigator.clipboard.writeText(c.dataset.copy); toast("UPI ID copied"); } catch { toast(c.dataset.copy); } }
     const d = e.target.closest("[data-demo-approve]");

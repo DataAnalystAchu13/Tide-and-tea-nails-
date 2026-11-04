@@ -45,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -257,7 +258,7 @@ private fun Actions(b: Booking, vm: OwnerViewModel) {
             var advance by rememberSaveable(b.id) { mutableStateOf(b.price.advance.toString()) }
             var note by rememberSaveable(b.id) { mutableStateOf("") }
             Section("Review") {
-                Text("Adjust the price if needed (add the travel charge and any \"price varies\" add-ons to the total), add a note for the client, then approve. They'll see the advance to pay on the website.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("The client sees the UPI QR right after booking and may pay before you look. Adjust the price if needed (travel, \"price varies\" add-ons), add a note, then approve. If they've paid, you'll see it here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(total, { total = it.filter(Char::isDigit) }, label = { Text("Total ₹") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
@@ -292,7 +293,7 @@ private fun Actions(b: Booking, vm: OwnerViewModel) {
         BookingStatus.PAYMENT_SUBMITTED -> Section("Check payment") {
             Text("The client says they paid ${money(b.price.advance)}.", style = MaterialTheme.typography.bodyMedium)
             InfoRow("UPI reference", b.paymentRef, strong = true)
-            Text("Find this reference in your UPI app before confirming.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Their slot is held. Find this reference in your UPI app, look at the inspo, then confirm. If you can't do this set, decline it and refund the advance from your UPI app.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = { vm.act("Client asked to re-check payment") { paymentNotFound(b) } }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("Not received") }
                 Button(
@@ -300,6 +301,10 @@ private fun Actions(b: Booking, vm: OwnerViewModel) {
                     colors = ButtonDefaults.buttonColors(containerColor = Pink, contentColor = Plum),
                 ) { Text("Confirm booking") }
             }
+            TextButton(
+                onClick = { vm.act("Declined. Refund ${money(b.price.advance)} from your UPI app.") { decline(b, "Sorry, we can't take this booking. Your advance of ${money(b.price.advance)} will be refunded to your UPI account.") } },
+                enabled = !vm.busy, colors = ButtonDefaults.textButtonColors(contentColor = Danger), modifier = Modifier.fillMaxWidth(),
+            ) { Text("Decline and refund") }
         }
         BookingStatus.CONFIRMED -> Section("Confirmed") {
             Text("Advance received. Balance due on the day: ${money(b.price.total - b.price.advance)}.", style = MaterialTheme.typography.bodyMedium)
