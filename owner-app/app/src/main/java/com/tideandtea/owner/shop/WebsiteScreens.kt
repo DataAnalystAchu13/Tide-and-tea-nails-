@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -656,7 +657,8 @@ private fun ConfirmDelete(title: String, text: String, onDismiss: () -> Unit, on
 
 @Composable
 private fun AddFab(label: String, onClick: () -> Unit) = ExtendedFloatingActionButton(
-    onClick = onClick, containerColor = Royal, contentColor = Color.White, shape = CircleShape,
+    // Edge-to-edge: keep the button above Android's navigation bar (3-button nav hid it).
+    onClick = onClick, modifier = Modifier.navigationBarsPadding(), containerColor = Royal, contentColor = Color.White, shape = CircleShape,
     icon = { Icon(Icons.Outlined.Add, null) }, text = { Text(label) },
 )
 
