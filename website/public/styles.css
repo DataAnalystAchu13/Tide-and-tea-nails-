@@ -981,3 +981,8 @@ h2 { color: var(--ink); }
 /* Main call to action is near-black, like the reference */
 .hero .btn-pink, .pagehead .btn-pink { background: var(--royal); color: #fff; }
 .hero .btn-pink:hover, .pagehead .btn-pink:hover { background: var(--royal-2); }
+@media (max-width: 600px) {
+  .svc-grid .svc:nth-child(3n+1) { background: #eef0f9; }
+  .svc-grid .svc:nth-child(3n+2) { background: #f8eef6; }
+  .svc-grid .svc:nth-child(3n) { background: #f1ecf8; }
+}
