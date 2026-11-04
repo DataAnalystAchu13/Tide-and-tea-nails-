@@ -5,6 +5,10 @@ name: Deploy Supabase
 #   SUPABASE_ACCESS_TOKEN  personal access token: supabase.com/dashboard/account/tokens
 #   SUPABASE_PROJECT_REF   the id in your project URL: https://<ref>.supabase.co
 #   SUPABASE_DB_PASSWORD   the database password chosen when the project was created
+# Optional, passed on to the Edge Functions as their secrets:
+#   FIREBASE_SERVICE_ACCOUNT  (already used for Hosting) becomes FCM_SERVICE_ACCOUNT for push notifications
+#   PUBLISH_TOKEN             GitHub fine-grained token (this repo, Contents: read and write) that lets the
+#                             owner app's "Publish website" button start a rebuild (GH_DISPATCH_TOKEN)
 on:
   push:
     branches: [main]
@@ -22,6 +26,8 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      FCM_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
     steps:
       - name: Check secrets
         id: check
@@ -47,3 +53,11 @@ jobs:
       - name: Deploy Edge Functions
         if: steps.check.outputs.ready == 'true'
         run: supabase functions deploy --project-ref "$PROJECT_REF" --use-api
+      - name: Set Edge Function secrets
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          args=("GH_REPO=${GITHUB_REPOSITORY}")
+          [ -n "$FCM_JSON" ] && args+=("FCM_SERVICE_ACCOUNT=$FCM_JSON")
+          [ -n "$PUBLISH_TOKEN" ] && args+=("GH_DISPATCH_TOKEN=$PUBLISH_TOKEN")
+          supabase secrets set --project-ref "$PROJECT_REF" "${args[@]}"
+          echo "Set: GH_REPO${FCM_JSON:+, FCM_SERVICE_ACCOUNT}${PUBLISH_TOKEN:+, GH_DISPATCH_TOKEN}"
