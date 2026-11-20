@@ -91,6 +91,27 @@ Without a key the site still works: customers tap **Use my current location** an
 2. **Razorpay (optional, needs a Razorpay account with KYC)**: Razorpay dashboard → Account & Settings → **API Keys** → generate. Add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` as Supabase Edge Function secrets. Then Webhooks → Add: URL `https://<project-ref>.supabase.co/functions/v1/razorpay-webhook`, event **payment.captured** (and **order.paid**), with a secret you make up, which you also save as `RAZORPAY_WEBHOOK_SECRET`. Until these are set, checkout uses the UPI + transaction ID flow.
 3. Set your UPI ID in the app (Website → Services and prices → Payment) before going live. Shop orders use the same UPI ID.
 
+### 8. WhatsApp alerts for new bookings and orders
+
+Every new booking request, advance payment, cancellation and press-on order is also sent to the owner's WhatsApp, with the client's chat link, the map pin for home visits and the items and address for orders. App pushes keep working as before. Nothing is sent until the secrets below are set, and a failed WhatsApp send never blocks a booking.
+
+**Option A: CallMeBot (free, 2 minutes, best for one owner phone).**
+1. On the owner's phone, open [callmebot.com/blog/free-api-whatsapp-messages](https://www.callmebot.com/blog/free-api-whatsapp-messages/), save the CallMeBot number shown there as a contact, and send it on WhatsApp: `I allow callmebot to send me messages`
+2. It replies with an API key.
+3. GitHub repo → Settings → Secrets and variables → Actions → add `OWNER_WHATSAPP` (the owner's number with 91, e.g. `919876543210`) and `CALLMEBOT_APIKEY` (the key).
+4. Actions → **Deploy Supabase** → Run workflow. (Or add the same two names in Supabase → Edge Functions → Secrets.)
+
+CallMeBot is a free hobby service: messages usually arrive in seconds, but it has no uptime promise, so keep the app's push notifications on too.
+
+**Option B: Meta WhatsApp Cloud API (official, for a business number).** Needs a Meta Business account and a phone number that is not already on WhatsApp. In WhatsApp Manager, create a *Utility* template named `new_order_alert` (language English) with this body (Meta does not allow a variable at the very start or end):
+
+    New alert: {{1}}
+    {{2}}
+    Details: {{3}}
+    Open the owner app to reply.
+
+ and wait for approval. Then add the secrets `OWNER_WHATSAPP` (one or more numbers, comma-separated), `WHATSAPP_TOKEN` (a permanent System User token with whatsapp_business_messaging), `WHATSAPP_PHONE_ID` (the sending number's Phone number ID) and, if your template has another name, `WHATSAPP_TEMPLATE`. Meta charges a small fee per utility message in India. If both options are set, add `WHATSAPP_PROVIDER` = `meta` or `callmebot` to choose.
+
 ## Changing prices, slots, studio location and UPI ID
 
 Change these in the app: **Website → Services and prices** and **Website → Days and slots**. They are saved in one database row (Supabase → **Table Editor → `config` → `main` → `data`**), so you can also edit the JSON there. The booking page picks up changes right away, no publish needed. The studio location (`studio.lat`, `studio.lng`) is only editable in Supabase.

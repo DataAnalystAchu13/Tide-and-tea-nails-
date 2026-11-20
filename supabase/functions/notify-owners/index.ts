@@ -1,14 +1,17 @@
-// Sends a push notification to every phone signed in to the Tide & Tea owner app.
+// Sends a push notification to every phone signed in to the Tide & Tea owner app,
+// and a WhatsApp message to the owner for new bookings and orders (see _shared/whatsapp.mjs).
 //
 // Called only by the database (public.notify_owners, via pg_net) with the shared secret
 // generated in private.app_settings. Deploy with --no-verify-jwt; the secret is the auth.
 //
-// Required Edge Function secret:
+// Edge Function secrets (each part is skipped when its secrets are missing):
 //   FCM_SERVICE_ACCOUNT  the JSON key of a Firebase service account
 //                        (Firebase console > Project settings > Service accounts > Generate new private key)
+//   OWNER_WHATSAPP + CALLMEBOT_APIKEY (or the Meta Cloud API ones)  WhatsApp alerts, see whatsapp.mjs
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase automatically.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { WHATSAPP_TYPES, whatsappConfig, whatsappRequests } from "../_shared/whatsapp.mjs";
 
 interface ServiceAccount {
   project_id: string;
@@ -86,17 +89,26 @@ Deno.serve(async (req) => {
   }
   if (!payload?.title) return json(400, { error: "title required" });
 
+  const [push, whatsapp] = await Promise.all([
+    sendPush(payload).catch((e) => ({ error: String(e) })),
+    sendWhatsApp(payload).catch((e) => ({ error: String(e) })),
+  ]);
+  return json(200, { push, whatsapp });
+});
+
+/** FCM push to every owner phone in push_tokens. */
+async function sendPush(payload: NotifyPayload) {
   const raw = Deno.env.get("FCM_SERVICE_ACCOUNT");
   if (!raw) {
     console.warn("FCM_SERVICE_ACCOUNT is not set; skipping push");
-    return json(200, { sent: 0, skipped: "FCM_SERVICE_ACCOUNT not set" });
+    return { sent: 0, skipped: "FCM_SERVICE_ACCOUNT not set" };
   }
   const sa: ServiceAccount = JSON.parse(raw);
 
   const { data: rows, error } = await supabase.from("push_tokens").select("token");
-  if (error) return json(500, { error: error.message });
+  if (error) throw new Error(error.message);
   const tokens = (rows ?? []).map((r) => r.token as string);
-  if (!tokens.length) return json(200, { sent: 0 });
+  if (!tokens.length) return { sent: 0 };
 
   // FCM data values must be strings.
   const data = Object.fromEntries(
@@ -134,5 +146,30 @@ Deno.serve(async (req) => {
   }));
 
   if (dead.length) await supabase.from("push_tokens").delete().in("token", dead);
-  return json(200, { sent, removed: dead.length });
-});
+  return { sent, removed: dead.length };
+}
+
+/** WhatsApp message to the owner for bookings and orders, with the client's details. */
+async function sendWhatsApp(payload: NotifyPayload) {
+  const type = String(payload.data?.type ?? "");
+  if (!WHATSAPP_TYPES.has(type)) return { skipped: "not a booking or order" };
+  const cfg = whatsappConfig((k: string) => Deno.env.get(k));
+  if (!cfg) return { skipped: "WhatsApp is not set up" };
+
+  const id = String(payload.data?.bookingId ?? "");
+  let row = null;
+  if (id) {
+    const { data } = await supabase.from(type === "order" ? "orders" : "bookings").select("*").eq("id", id).maybeSingle();
+    row = data;
+  }
+  let sent = 0;
+  for (const { url, init } of whatsappRequests(cfg, payload, row)) {
+    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
+    const text = await res.text();
+    // CallMeBot answers 200 with an HTML page even for some errors; look for its error words too.
+    const failed = !res.ok || (cfg.provider === "callmebot" && /APIKey is invalid|ERROR/i.test(text));
+    if (!failed) sent++;
+    else console.error(`WhatsApp send failed (${cfg.provider} ${res.status}): ${text.slice(0, 300)}`);
+  }
+  return { provider: cfg.provider, sent };
+}
